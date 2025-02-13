@@ -1170,16 +1170,8 @@ class Events {
 	 * @return integer
 	 */
 	public static function get_transaction_micros( float $price ) {
-		$currencies_without_decimals = array( 'JPY' );
-
-		$current_currency = get_woocommerce_currency();
-
-		if ( in_array( $current_currency, $currencies_without_decimals, true ) ) {
-			return intval( $price * 1000000 );
-		}
-
-		// For currencies with decimals, we need to multiply times 100 (cents) to get the correct number.
-		return intval( $price * 100 * 10000 );
+		// Sift expects the amount in micros, so we multiply by 1,000,000, regardless of the currency.
+		return intval( $price * 1000000 );
 	}
 
 	/**
