@@ -1178,8 +1178,8 @@ class Events {
 			return intval( $price * 1000000 );
 		}
 
-		// For currencies with decimals
-		return intval( $price * 10000 );
+		// For currencies with decimals, we need to multiply times 100 (cents) to get the correct number.
+		return intval( $price * 100 * 10000 );
 	}
 
 	/**
