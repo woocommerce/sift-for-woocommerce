@@ -119,16 +119,18 @@ function select_first_payments_capture( $ppcp_data_order ) {
 add_filter( 'sift_for_woocommerce_ppcp-gateway_payment_method_details_from_order', __NAMESPACE__ . '\get_from_order', 10, 2 );
 add_filter( 'sift_for_woocommerce_ppcp-gateway_charge_details_from_order', __NAMESPACE__ . '\get_from_order', 10, 2 );
 
+// Filter the payment type string, returning the provided $value if not found.
 add_filter( 'sift_for_woocommerce_ppcp-gateway_payment_type_string', fn( $value, $ppcp_gateway_payment_type ) => 'ppcp' === $ppcp_gateway_payment_type ? '$third_party_processor' : $value );
 
+// Add filters to extract card last4, avs/cvv result codes and decline reason codes from $ppcp_data, returning the provided $value if not found.
 add_filter( 'sift_for_woocommerce_ppcp-gateway_card_last4', fn( $value, $ppcp_data ) => $ppcp_data['wc_order']?->get_meta_data( PayPalGateway::FRAUD_RESULT_META_KEY )['card_last_digits'] ?? $value, 10, 2 );
 add_filter( 'sift_for_woocommerce_ppcp-gateway_avs_result_code', fn( $value, $ppcp_data ) => select_first_payments_authorization( $ppcp_data['order'] )?->fraud_processor_response()?->avs_code() ?? $value, 10, 2 );
 add_filter( 'sift_for_woocommerce_ppcp-gateway_cvv_result_code', fn( $value, $ppcp_data ) => select_first_payments_authorization( $ppcp_data['order'] )?->fraud_processor_response()?->cvv_code() ?? $value, 10, 2 );
 add_filter( 'sift_for_woocommerce_ppcp-gateway_decline_reason_code', fn( $value, $ppcp_data ) => select_first_payments_authorization( $ppcp_data['order'] )?->to_array()['reason_code'] ?? $value, 10, 2 );
 
+// Add filters to extract payer id, email, seller protection eligibility, payment status from $ppcp_data, returning the provided $value if not found.
 add_filter( 'sift_for_woocommerce_ppcp-gateway_paypal_payer_id', fn( $value, $ppcp_data ) => $ppcp_data['order']?->payer()?->payer_id() ?? $value, 10, 2 );
 add_filter( 'sift_for_woocommerce_ppcp-gateway_paypal_payer_email', fn( $value, $ppcp_data ) => $ppcp_data['order']?->payer()?->email_address() ?? $value, 10, 2 );
-
 add_filter( 'sift_for_woocommerce_ppcp-gateway_paypal_protection_eligibility', fn( $value, $ppcp_data ) => select_first_payments_capture( $ppcp_data['order'] )?->seller_protection()?->status ?? $value, 10, 2 );
 add_filter( 'sift_for_woocommerce_ppcp-gateway_paypal_payment_status', fn( $value, $ppcp_data ) => select_first_payments_capture( $ppcp_data['order'] )?->status()?->name() ?? $value, 10, 2 );
 
