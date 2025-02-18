@@ -499,6 +499,10 @@ class Events {
 
 		$cart_item = $cart->get_cart_item( $cart_item_key );
 		$product   = $cart_item['data'];
+		if ( empty( $product ) ) {
+			// The item removed from cart no longer exists as a product. Skip sending this event to Sift.
+			return;
+		}
 		$user      = wp_get_current_user();
 
 		$properties = array(
