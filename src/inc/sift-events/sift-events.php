@@ -492,15 +492,14 @@ class Events {
 	 * @return void
 	 */
 	public static function remove_item_from_cart( string $cart_item_key, \WC_Cart $cart ) {
-
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$remove_item_from_cart ) ) {
 			return;
 		}
 
 		$cart_item = $cart->get_cart_item( $cart_item_key );
-		$product   = $cart_item['data'];
+		$product   = $cart_item['data'] ?? null;
 		if ( empty( $product ) ) {
-			// The item removed from cart no longer exists as a product. Skip sending this event to Sift.
+			// The item removed from cart no longer exists as a product or has missing product data. Skip sending this event to Sift.
 			return;
 		}
 		$user      = wp_get_current_user();
