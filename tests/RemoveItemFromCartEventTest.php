@@ -60,7 +60,7 @@ class RemoveItemFromCartEventTest extends EventTest {
 		\WC()->cart->remove_cart_item( $cart_item_key );
 
 		// Assert
-		$events  = static::filter_events(
+		$events = static::filter_events(
 			[
 				'event'                 => '$remove_item_from_cart',
 				'properties.$item.$sku' => $sku,
