@@ -3,26 +3,22 @@
 add_action(
 	'woocommerce_init',
 	function () {
-		$gateways    = \WC()->payment_gateways->get_available_payment_gateways();
-		$gateway_ids = array_keys( $gateways );
+		if ( class_exists( 'WC_Gateway_Stripe' ) ) {
+			require_once __DIR__ . '/lib/stripe.php';
+			require_once __DIR__ . '/stripe.php';
+		}
 
-		foreach ( $gateway_ids as $gateway_id ) {
-			switch ( $gateway_id ) {
-				case 'stripe':
-					require_once __DIR__ . '/lib/stripe.php';
-					require_once __DIR__ . '/stripe.php';
-					break;
-				case 'ppcp-gateway':
-					require_once __DIR__ . '/ppcp-gateway.php';
-					break;
-				case 'woopayments':
-					require_once __DIR__ . '/transact.php';
-					break;
-				case 'woocommerce_payments':
-					require_once __DIR__ . '/lib/stripe.php';
-					require_once __DIR__ . '/woocommerce-payments.php';
-					break;
-			}
+		if ( class_exists( 'WooCommerce\PayPalCommerce\PPCP' ) ) {
+			require_once __DIR__ . '/ppcp-gateway.php';
+		}
+
+		if ( defined( 'TRANSACT_GATEWAY_PLUGIN_DIR' ) ) {
+			require_once __DIR__ . '/transact.php';
+		}
+
+		if ( class_exists( 'WC_Payments_Features' ) ) {
+			require_once __DIR__ . '/lib/stripe.php';
+			require_once __DIR__ . '/woocommerce-payments.php';
 		}
 	}
 );
