@@ -498,8 +498,12 @@ class Events {
 		}
 
 		$cart_item = $cart->get_cart_item( $cart_item_key );
-		$product   = $cart_item['data'];
-		$user      = wp_get_current_user();
+		$product   = $cart_item['data'] ?? null;
+		if ( empty( $product ) ) {
+			// The item removed from cart no longer exists as a product or has missing product data. Skip sending this event to Sift.
+			return;
+		}
+		$user = wp_get_current_user();
 
 		$properties = array(
 			'$user_id'      => self::format_user_id( $user->ID ?? 0 ),
