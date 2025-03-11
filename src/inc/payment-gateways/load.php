@@ -20,5 +20,6 @@ add_action(
 			require_once __DIR__ . '/lib/stripe.php';
 			require_once __DIR__ . '/woocommerce-payments.php';
 		}
-	}
+	},
+	1000
 );
