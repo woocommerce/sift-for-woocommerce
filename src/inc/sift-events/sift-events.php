@@ -606,15 +606,13 @@ class Events {
 
 		// Determine user and session context.
 		$user_id    = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$is_admin   = 1 === $user_id;
-		$user_email = wp_get_current_user()->user_email ?? null;
+		$user_id    = self::format_user_id( intval( $user_id ) );
+		$user_email = wp_get_current_user()->user_email ?? $order->get_billing_email() ?? null;
 
-		// Figure out if it should use the session ID if no logged-in user exists.
-		if ( ! $user_id || $is_admin ) {
-			$user_id = $order->get_user_id() ?? null; // Use order user ID if it isn't available otherwise
+		// If there is no user ID, fall back to the billing email as the user ID.
+		if ( ! $user_id ) {
+			$user_id = $user_email;
 		}
-
-		$user_id = self::format_user_id( intval( $user_id ) );
 
 		$browser = self::get_client_browser();
 		$ip      = $order->get_customer_ip_address() ?? self::get_client_ip();
@@ -723,7 +721,10 @@ class Events {
 	 * @return boolean True if the order is free.
 	 */
 	public static function is_free_order( \WC_Order $order ) {
-		return $order->get_total() === 0;
+		$total = $order->get_total();
+
+		// If the total is 0 or 0.00, it's a free order.
+		return 0 === $total || '0.00' === $total;
 	}
 
 	/**
@@ -738,22 +739,20 @@ class Events {
 	 * @return void
 	 */
 	public static function transaction( \WC_Order $order, string $status, string $transaction_type ) {
-
-		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$transaction ) ) {
+		// $transaction requires a positive amount, so we don't send it for free orders.
+		if ( self::is_free_order( $order ) || ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$transaction ) ) {
 			return;
 		}
 
 		// Determine user and session context.
 		$user_id    = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$is_admin   = 1 === $user_id;
-		$user_email = wp_get_current_user()->user_email ?? null;
+		$user_id    = self::format_user_id( intval( $user_id ) );
+		$user_email = wp_get_current_user()->user_email ?? $order->get_billing_email() ?? null;
 
-		// Figure out if it should use the session ID if no logged-in user exists.
-		if ( ! $user_id || $is_admin ) {
-			$user_id = $order->get_user_id() ?? null; // Use order user ID if it isn't available otherwise
+		// If there is no user ID, fall back to the billing email as the user ID.
+		if ( ! $user_id ) {
+			$user_id = $user_email;
 		}
-
-		$user_id = self::format_user_id( intval( $user_id ) );
 
 		$properties = array(
 			'$user_id'            => $user_id,
@@ -820,15 +819,14 @@ class Events {
 		}
 
 		// Determine user and session context.
-		$user_id  = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$is_admin = 1 === $user_id;
+		$user_id    = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
+		$user_id    = self::format_user_id( intval( $user_id ) );
+		$user_email = wp_get_current_user()->user_email ?? $order->get_billing_email() ?? null;
 
-		// Figure out if it should use the session ID if no logged-in user exists.
-		if ( ! $user_id || $is_admin ) {
-			$user_id = $order->get_user_id() ?? null; // Use order user ID if it isn't available otherwise
+		// If there is no user ID, fall back to the billing email as the user ID.
+		if ( ! $user_id ) {
+			$user_id = $user_email;
 		}
-
-		$user_id = self::format_user_id( intval( $user_id ) );
 
 		$properties = array(
 			'$user_id'      => $user_id, // Using our guaranteed user ID.
