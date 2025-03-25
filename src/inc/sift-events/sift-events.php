@@ -605,8 +605,8 @@ class Events {
 		$sift_order = Sift_For_WooCommerce::get_sift_order_from_wc_order( $order );
 
 		// Determine user and session context.
-		$user_id  = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$is_admin = 1 === $user_id;
+		$user_id    = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
+		$is_admin   = 1 === $user_id;
 		$user_email = wp_get_current_user()->user_email ?? null;
 
 		// Figure out if it should use the session ID if no logged-in user exists.
@@ -617,7 +617,7 @@ class Events {
 		$user_id = self::format_user_id( intval( $user_id ) );
 
 		$browser = self::get_client_browser();
-		$ip = $order->get_customer_ip_address() ?? self::get_client_ip();
+		$ip      = $order->get_customer_ip_address() ?? self::get_client_ip();
 
 		$properties = array(
 			'$user_id'            => $user_id,
@@ -744,8 +744,8 @@ class Events {
 		}
 
 		// Determine user and session context.
-		$user_id  = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$is_admin = 1 === $user_id;
+		$user_id    = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
+		$is_admin   = 1 === $user_id;
 		$user_email = wp_get_current_user()->user_email ?? null;
 
 		// Figure out if it should use the session ID if no logged-in user exists.

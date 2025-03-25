@@ -1706,7 +1706,7 @@ class SiftEventsValidator {
 	public static function validate_transaction( array $data ) {
 		$validator_map = array(
 			'$user_id'            => array( __CLASS__, 'validate_id' ),
-			'$user_email'         => array( __CLASS__, 'validate_email' ), 
+			'$user_email'         => array( __CLASS__, 'validate_email' ),
 			'$session_id'         => array( __CLASS__, 'validate_id' ),
 			'$amount'             => 'is_int',
 			'$currency_code'      => array( __CLASS__, 'validate_currency_code' ),
