@@ -540,7 +540,6 @@ class Events {
 	 * @return void
 	 */
 	public static function create_order( string $order_id, \WC_Order $order ) {
-
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_order ) ) {
 			return;
 		}
@@ -564,102 +563,160 @@ class Events {
 	 * @return void
 	 */
 	public static function update_or_create_order( string $order_id, \WC_Order $order, bool $create_order = false ) {
-		if ( ! in_array( $order->get_status(), self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
-			return;
-		}
+		$event = $create_order ? Sift_Event_Types::$create_order : Sift_Event_Types::$update_order;
 
-		if ( ! $create_order && ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$update_order ) ) { // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound
-			return;
-		}
-
-		// Determine user and session context.
-		$user_id  = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$is_admin = 1 === $user_id;
-
-		// Figure out if it should use the session ID if no logged-in user exists.
-		if ( ! $user_id || $is_admin ) {
-			$user_id = $order->get_user_id() ?? null; // Use order user ID if it isn't available otherwise
-		}
-
-		$physical_or_electronic = '$electronic';
-		$items                  = array();
-		foreach ( $order->get_items( 'line_item' ) as $item ) {
-			if ( ! $item instanceof WC_Order_Item_Product ) {
-				// log an error...
-				wc_get_logger()->error( sprintf( 'Item not Item Product (order: %d).', $order->get_id() ) );
-				continue;
-			}
-			// Most of this we're basing off return value from `WC_Order_Item_Product::get_product()` as it will return the correct variation.
-			$product = $item->get_product();
-			if ( empty( $product ) ) {
-				// log an error...
-				wc_get_logger()->error( sprintf( 'Product not found for order %d.', $order->get_id() ) );
-				continue;
-			}
-
-			$items[] = array(
-				'$item_id'       => (string) $product->get_id(),
-				'$sku'           => $product->get_sku(),
-				'$product_title' => $product->get_name(),
-				'$price'         => self::get_transaction_micros( floatval( $product->get_price() ) ),
-				'$currency_code' => $order->get_currency(), // For the order specifically, not the whole store.
-				'$quantity'      => $item->get_quantity(),
-				'$category'      => self::get_product_category( $product ),
-				'$tags'          => wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' ),
+		// Log the event type we're trying to send for debugging.
+		if ( function_exists( 'wc_get_logger' ) ) {
+			wc_get_logger()->debug(
+				sprintf( 'Preparing to send %s event for order %s', $event, $order_id ),
+				array( 'source' => 'sift-order-events' )
 			);
+		}
 
-			if ( ! $product->is_virtual() ) {
-				$physical_or_electronic = '$physical';
+		if ( ! Sift_Event_Types::can_event_be_sent( $event ) ) {
+			// Log when event can't be sent due to settings.
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->debug(
+					sprintf( 'Event %s disabled for order %s', $event, $order_id ),
+					array( 'source' => 'sift-order-events' )
+				);
+			}
+			return;
+		}
+
+		$sift_order = Sift_For_WooCommerce::get_sift_order_from_wc_order( $order );
+
+		$user_id    = $order->get_user_id();
+		$user       = get_user_by( 'id', $user_id );
+		$user_email = $order->get_billing_email();
+
+		$ip = $order->get_customer_ip_address() ?? self::get_client_ip();
+
+		// Get user ID and ensure it's never empty.
+		$s_user_id = self::format_user_id( intval( $user_id ) );
+		if ( empty( $s_user_id ) ) {
+			$user_email = $order->get_billing_email();
+			if ( ! empty( $user_email ) ) {
+				// For guest users, use email directly.
+				$s_user_id = $user_email;
+			} else {
+				// Last resort - use anonymous ID based on order ID.
+				$s_user_id = 'anonymous_' . $order_id;
+			}
+
+			// Log this fallback for debugging.
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->debug(
+					sprintf( 'Using fallback user ID for order %s in transaction event', $order->get_id() ),
+					array( 'source' => 'sift-transaction' )
+				);
 			}
 		}
+
+		$browser = self::get_client_browser();
 
 		$properties = array(
-			'$user_id'         => '',
-			'$user_email'      => $order->get_billing_email() ? $order->get_billing_email() : null, // pulling the billing email for the order, NOT customer email
-			'$session_id'      => \WC()->session?->get_customer_unique_id() ?? '',
-			'$order_id'        => $order_id,
-			'$verification_phone_number'
-				=> '+' === substr( $order->get_billing_phone(), 0, 1 ) ? preg_replace( '/[^0-9\+]/', '', $order->get_billing_phone() ) : null,
-			'$amount'          => self::get_transaction_micros( floatval( $order->get_total() ) ),
-			'$currency_code'   => get_woocommerce_currency(),
-			'$items'           => $items,
-			'$payment_methods' => self::get_order_payment_methods( $order ),
-			'$shipping_method' => $physical_or_electronic,
-			'$browser'         => self::get_client_browser(),
-			'$site_domain'     => wp_parse_url( site_url(), PHP_URL_HOST ),
-			'$site_country'    => wc_get_base_location()['country'],
-			'$ip'              => self::get_client_ip(),
-			'$time'            => intval( 1000 * microtime( true ) ),
+			'$user_id'            => $s_user_id,
+			'$session_id'         => WC()->session?->get_customer_unique_id() ?? '',
+			'$order_id'           => $order_id,
+			'$user_email'         => $user_email,
+			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ),
+			'$payment_methods'    => $sift_order->get_payment_methods(),
+			'$currency_code'      => $order->get_currency(),
+			'$billing_address'    => self::get_order_address( $order_id, 'billing' ),
+			'$shipping_address'   => self::get_order_address( $order_id, 'shipping' ),
+			'$expedited_shipping' => false,
+			'$items'              => array(),
+			'$browser'            => $browser,
+			'$ip'                 => $ip,
+			'$time'               => intval( 1000 * microtime( true ) ),
 		);
 
-		// Add the user_id only if a user exists, otherwise, let it remain empty.
-		// Ref: https://developers.sift.com/docs/php/apis-overview/core-topics/faq/tracking-users
-		if ( $user_id && ! $is_admin ) {
-			$properties['$user_id'] = self::format_user_id( $user_id );
+		// Add the meta data.
+		foreach ( $order->get_items() as $item ) {
+			$product = $item->get_product();
+
+			wc_get_logger()->debug(
+				$product,
+				array( 'source' => 'sift-free-orders-product' )
+			);
+
+			if ( ! ( $product instanceof WC_Product ) ) {
+				continue;
+			}
+
+			$sku = empty( $product->get_sku() ) ? $product->get_id() : $product->get_sku();
+
+			// Construct item with ONLY fields specified in Sift API documentation.
+			$properties['$items'][] = array(
+				'$item_id'       => (string) $sku,
+				'$product_title' => $product->get_name(),
+				'$price'         => self::get_transaction_micros( floatval( $product->get_price() ) ),
+				'$quantity'      => intval( $item->get_quantity() ),
+				'$currency_code' => $order->get_currency(),
+				'$category' => self::get_product_category( $product ) ? self::get_product_category( $product ) : 'Uncategorized',
+			);
 		}
 
-		// Add in the address information if it's available.
-		$billing_address = self::get_order_address( $order_id, 'billing' );
-		if ( ! empty( $billing_address ) ) {
-			$properties['$billing_address'] = $billing_address;
+		// Detect free orders.
+		$is_free_order = self::is_free_order( $order );
+
+		// Handle free orders by making required adjustments to properties.
+		if ( $is_free_order ) {
+			// Remove payment methods entirely for free orders.
+			unset( $properties['$payment_methods'] );
 		}
 
-		$shipping_address = self::get_order_address( $order_id, 'shipping' );
-		if ( ! empty( $shipping_address ) ) {
-			$properties['$shipping_address'] = $shipping_address;
+		// If session ID is empty, create one for this order.
+		if ( empty( $properties['$session_id'] ) ) {
+			$properties['$session_id'] = 'order_session_' . $order_id;
 		}
 
 		try {
 			SiftEventsValidator::validate_create_or_update_order( $properties );
+
+			// Log successful validation.
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->debug(
+					sprintf( 'Successfully validated %s event for order %s, adding to queue', $event, $order_id ),
+					array( 'source' => 'sift-order-events' )
+				);
+			}
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			// Log validation error in detail.
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->error(
+					sprintf( 'Validation error for %s event: %s', $event, $e->getMessage() ),
+					array(
+						'source' => 'sift-order-events',
+						'order_id' => $order_id,
+						'properties' => wp_json_encode( $properties )
+					)
+				);
+			}
 			return;
 		}
 
-		self::add(
-			$create_order ? Sift_Event_Types::$create_order : Sift_Event_Types::$update_order,
-			$properties
-		);
+		// Add event to queue.
+		self::add( $event, $properties );
+
+		// Log successful queue addition.
+		if ( function_exists( 'wc_get_logger' ) ) {
+			wc_get_logger()->debug(
+				sprintf( 'Successfully added %s event for order %s to queue', $event, $order_id ),
+				array( 'source' => 'sift-order-events' )
+			);
+		}
+	}
+
+	/**
+	 * Determine if an order is a free order (zero total)
+	 *
+	 * @param \WC_Order $order The order to check.
+	 * @return boolean True if the order is free.
+	 */
+	public static function is_free_order( \WC_Order $order ) {
+		return $order->get_total() === 0;
 	}
 
 	/**
@@ -679,16 +736,46 @@ class Events {
 			return;
 		}
 
+		// Get user ID and ensure it's never empty.
+		$user_id = $order->get_user_id();
+		$s_user_id = self::format_user_id( intval( $user_id ) );
+
+		// If user ID is empty, try to use email for guest users or generate anonymous ID.
+		if ( empty( $s_user_id ) ) {
+			$user_email = $order->get_billing_email();
+			if ( ! empty( $user_email ) ) {
+				// Format the email to be a valid user ID for guests.
+				$s_user_id = 'guest_' . md5( $user_email );
+			} else {
+				// Last resort - use anonymous ID based on order ID.
+				$s_user_id = 'anonymous_' . md5( $order->get_id() );
+			}
+
+			// Log this fallback for debugging.
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->debug(
+					sprintf( 'Using fallback user ID for order %s in transaction event', $order->get_id() ),
+					array( 'source' => 'sift-transaction' )
+				);
+			}
+		}
+
 		$properties = array(
-			'$user_id'            => self::format_user_id( $order->get_user_id() ),
+			'$user_id'            => $s_user_id, // Using our guaranteed user ID.
 			'$session_id'         => \WC()->session?->get_customer_unique_id() ?? '',
-			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ), // Gotta multiply it up to give an integer.
+			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ),
 			'$currency_code'      => $order->get_currency(),
 			'$order_id'           => (string) $order->get_id(),
 			'$transaction_type'   => $transaction_type,
 			'$transaction_status' => $status,
 			'$time'               => intval( 1000 * microtime( true ) ),
 		);
+
+		// If the session ID is empty, create one from the order ID.
+		// This ensures we always have a session ID even for admin-created orders.
+		if ( empty( $properties['$session_id'] ) ) {
+			$properties['$session_id'] = md5( 'order_session_' . $order->get_id() );
+		}
 
 		try {
 			SiftEventsValidator::validate_transaction( $properties );
@@ -700,7 +787,6 @@ class Events {
 
 		self::add( Sift_Event_Types::$transaction, $properties );
 	}
-
 
 	/**
 	 * Adds the event for the order status update
@@ -720,8 +806,51 @@ class Events {
 			return;
 		}
 
+		// Check if this is a free order and if we should send a create_order event too.
+		$is_free_order = self::is_free_order( $order );
+
+		// For free orders that are just being created (moving to pending/processing), send the create_order event.
+		if ( $is_free_order &&
+			in_array( $status_transition['to'], array( 'pending', 'processing' ), true ) &&
+			Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_order ) ) {
+
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->debug(
+					sprintf( 'Free order detected at status change - triggering create_order event for order %s', $order_id ),
+					array( 'source' => 'sift-free-orders' )
+				);
+			}
+
+			// This will trigger the create_order event for this free order.
+			self::create_order( $order_id, $order );
+		}
+
+		// Get user ID and ensure it's never empty.
+		$user_id = $order->get_user_id();
+		$s_user_id = self::format_user_id( intval( $user_id ) );
+
+		// If user ID is empty, try to use email for guest users or generate anonymous ID.
+		if ( empty( $s_user_id ) ) {
+			$user_email = $order->get_billing_email();
+			if ( ! empty( $user_email ) ) {
+				// Format the email to be a valid user ID for guests.
+				$s_user_id = $user_email;
+			} else {
+				// Last resort - use anonymous ID based on order ID.
+				$s_user_id = 'anonymous_' . md5( $order_id );
+			}
+
+			// Log this fallback for debugging.
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->debug(
+					sprintf( 'Using fallback user ID for order %s in order_status event', $order_id ),
+					array( 'source' => 'sift-order-status' )
+				);
+			}
+		}
+
 		$properties = array(
-			'$user_id'      => self::format_user_id( $order->get_user_id() ),
+			'$user_id'      => $s_user_id, // Using our guaranteed user ID.
 			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
 			'$order_id'     => $order_id,
 			'$source'       => $status_transition['manual'] ? '$manual_review' : '$automated',
@@ -756,6 +885,12 @@ class Events {
 				self::transaction( $order, '$failure', '$sale' );
 				$properties['$order_status'] = '$canceled';
 				break;
+		}
+
+		// If the session ID is empty, create one from the order ID.
+		// This ensures we always have a session ID even for admin-created orders.
+		if ( empty( $properties['$session_id'] ) ) {
+			$properties['$session_id'] = md5( 'order_session_' . $order_id );
 		}
 
 		// For manual reviews add the user as the `$analyst`.
@@ -806,6 +941,32 @@ class Events {
 		}
 
 		self::add( Sift_Event_Types::$chargeback, $properties );
+	}
+
+	/**
+	 * Logs when an unsupported order status change occurs.
+	 * This is called for order status transitions not explicitly handled by our supported statuses.
+	 *
+	 * @param string    $order_id Order ID.
+	 * @param string    $old_status The old order status.
+	 * @param string    $new_status The new order status.
+	 *
+	 * @return void
+	 */
+	public static function maybe_log_change_order_status( string $order_id, string $old_status, string $new_status ) {
+		// Check if this is a supported status change that would be caught by our other hook.
+		if ( in_array( $new_status, self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
+			// This status change will be handled by the dedicated hook, so we can skip.
+			return;
+		}
+
+		// Log the unsupported status change.
+		if ( function_exists( 'wc_get_logger' ) ) {
+			wc_get_logger()->info(
+				sprintf( 'Unsupported order status change for order %s from %s to %s', $order_id, $old_status, $new_status ),
+				array( 'source' => 'sift-order-events' )
+			);
+		}
 	}
 
 	/**
@@ -860,20 +1021,18 @@ class Events {
 	 * @param string $decision_id The decision ID.
 	 * @param string $user_id     The user ID.
 	 *
-	 * @return void
+	 * @return string|null The decision ID or null if no decision ID was provided.
 	 */
 	public static function apply_decision( string $decision_id, string $user_id ) {
 		\apply_filters( 'sift_decision_received', null, $decision_id, $user_id );
+		return $decision_id;
 	}
 
-
 	/**
-	 * Enqueue an event to send.  This will enable sending them all at shutdown.
+	 * Add a Sift Event to the queue.
 	 *
-	 * @param string $event      The event we're recording -- generally will start with a $.
-	 * @param array  $properties An array of the data we're passing along to Sift.  Keys will generally start with a $.
-	 *
-	 * @return void
+	 * @param string $event      The event to enqueue.
+	 * @param array  $properties The properties to send with the event.
 	 */
 	public static function add( string $event, array $properties ) {
 		// Give a chance for the platform to modify the data (and add potentially new custom data)
@@ -908,6 +1067,21 @@ class Events {
 	 */
 	public static function send() {
 		if ( self::count() > 0 ) {
+			// Log all events that are about to be sent
+			if ( function_exists( 'wc_get_logger' ) ) {
+				$event_types = array_map(
+					function( $entry ) {
+						return $entry['event'];
+					},
+					self::$to_send
+				);
+
+				wc_get_logger()->debug(
+					sprintf( 'Sending %d events to Sift: %s', self::count(), implode(', ', $event_types) ),
+					array( 'source' => 'sift-events-send' )
+				);
+			}
+
 			$client = \Sift_For_WooCommerce\Sift_For_WooCommerce::get_api_client();
 			if ( empty( $client ) ) {
 				wc_get_logger()->error(
@@ -1067,194 +1241,116 @@ class Events {
 
 		switch ( strtolower( $type ) ) {
 			// WC_Order doesn't have the same `->get_billing` and `->get_shipping()` that the Customer object
-			// has, so we call this way instead.  It also assumes `view` context.
+			// has, so we call this way instead.  It also assumes `view`
 			case 'billing':
-				$address = $order->get_address( 'billing' );
-				break;
+				return array(
+					'$name'      => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+					'$phone'     => $order->get_billing_phone(),
+					'$address_1' => $order->get_billing_address_1(),
+					'$address_2' => $order->get_billing_address_2(),
+					'$city'      => $order->get_billing_city(),
+					'$region'    => $order->get_billing_state(),
+					'$country'   => $order->get_billing_country(),
+					'$zipcode'   => $order->get_billing_postcode(),
+				);
 			case 'shipping':
-				$address = $order->get_address( 'shipping' );
-				break;
+				return array(
+					'$name'      => $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name(),
+					'$phone'     => $order->get_billing_phone(), // Orders don't have shipping phone, use billing phone
+					'$address_1' => $order->get_shipping_address_1(),
+					'$address_2' => $order->get_shipping_address_2(),
+					'$city'      => $order->get_shipping_city(),
+					'$region'    => $order->get_shipping_state(),
+					'$country'   => $order->get_shipping_country(),
+					'$zipcode'   => $order->get_shipping_postcode(),
+				);
 			default:
 				return null;
 		}
-
-		return array(
-			'$name'      => $address['first_name'] . ' ' . $address['last_name'],
-			'$phone'     => $address['phone'],
-			'$address_1' => $address['address_1'],
-			'$address_2' => $address['address_2'],
-			'$city'      => $address['city'],
-			'$region'    => $address['state'],
-			'$country'   => $address['country'],
-			'$zipcode'   => $address['postcode'],
-		);
 	}
 
 	/**
-	 * Get an array of the customer's payment methods.
+	 * Format a user ID for sending to Sift.
 	 *
-	 * Return data should conform to the expected format described here:
-	 * https://developers.sift.com/docs/curl/events-api/complex-field-types/payment-method
-	 *
-	 * @param integer $user_id The User / Customer ID.
-	 *
-	 * @return array
-	 */
-	private static function get_customer_payment_methods( int $user_id ) {
-		$payment_methods = array();
-
-		/**
-		 * Allow / disallow customer payment method lookup via looping over all customer orders and extracting the payment method from each order.
-		 *
-		 * If this filter returns false, the sift_for_woocommerce_get_customer_payment_methods filter should be implemented so that some payment methods are returned.
-		 *
-		 * Otherwise, no customer payment methods will be returned.
-		 *
-		 * @param boolean $allow True if this method of payment method lookup should be used, otherwise false.
-		 * @param integer $user_id The User / Customer ID.
-		 *
-		 * @return boolean True if this method of payment method lookup should be used, otherwise false.
-		 */
-		if ( apply_filters( 'sift_for_woocommerce_get_customer_payment_methods_via_order_enumeration', true, $user_id ) ) {
-			$customer_orders = wc_get_orders(
-				array(
-					'limit'    => -1,
-					'customer' => $user_id,
-					'status'   => wc_get_is_paid_statuses(),
-				)
-			);
-
-			$payment_methods = array_map(
-				function ( $order ) {
-					return static::get_order_payment_methods( $order )[0] ?? null;
-				},
-				$customer_orders
-			);
-		}
-
-		/**
-		 * Include a filter here for unexpected payment providers to be able to add their results in as well.
-		 *
-		 * @param array   $payment_methods An array of payment methods.
-		 * @param integer $user_id         The User / Customer ID.
-		 */
-		$payment_methods = apply_filters( 'sift_for_woocommerce_get_customer_payment_methods', $payment_methods, $user_id ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
-
-		$payment_methods = array_reduce(
-			$payment_methods,
-			function ( $payment_methods, $payment_method ) {
-				if ( ! empty( $payment_method ) && ! in_array( $payment_method, $payment_methods, true ) ) {
-					$payment_methods[] = $payment_method;
-				}
-				return $payment_methods;
-			},
-			array()
-		);
-
-		return $payment_methods ?? array();
-	}
-
-	/**
-	 * Get an array of the order's payment methods.
-	 *
-	 * Return data should conform to the expected format described here:
-	 * https://developers.sift.com/docs/curl/events-api/complex-field-types/payment-method
-	 *
-	 * @param \WC_Order $order The Woo Order object.
-	 *
-	 * @return array
-	 */
-	private static function get_order_payment_methods( \WC_Order $order ) {
-		return Sift_For_WooCommerce::get_instance()->get_sift_order_from_wc_order( $order )->get_payment_methods();
-	}
-
-	/**
-	 * Return the amount of transaction "micros"
-	 *
-	 * @link https://developers.sift.com/docs/curl/events-api/reserved-events/transaction in the $amount
-	 *
-	 * @param float $price The price to format.
-	 *
-	 * @return integer
-	 */
-	public static function get_transaction_micros( float $price ) {
-		// Sift expects the amount in micros, so we multiply by 1,000,000, regardless of the currency.
-		return intval( $price * 1000000 );
-	}
-
-	/**
-	 * Log error for unsupported status changes.
-	 *
-	 * @param string $order_id Order ID.
-	 * @param string $from     From status.
-	 * @param string $to       To status.
-	 *
-	 * @return void
-	 */
-	public static function maybe_log_change_order_status( string $order_id, string $from, string $to ) {
-		if ( ! in_array( $to, self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
-			wc_get_logger()->error(
-				sprintf(
-					'Unsupported status change from %s to %s for order %s.',
-					$from,
-					$to,
-					$order_id
-				)
-			);
-		}
-	}
-
-	/**
-	 * Returns the right user ID.
-	 *
-	 * @param integer $user_id Original user ID.
-	 *
-	 * @return string Returns an empty string if the user ID is 0
+	 * @param int $user_id The user ID to format.
+	 * @return string The formatted user ID.
 	 */
 	private static function format_user_id( int $user_id ): string {
-		if ( 0 === $user_id ) {
-			// Returns empty string if the user is unknown
-			// see https://developers.sift.com/tutorials/anonymous-users
+		// If user ID is 0 (for guests or not set), return empty string.
+		if ( empty( $user_id ) || 0 === $user_id ) {
 			return '';
 		}
 
+		// Convert to string and return.
 		return (string) $user_id;
 	}
 
 	/**
-	 * Return the hierarchy of the product category
+	 * Convert a currency amount to micros (1/1,000,000 of the base unit).
+	 * This format is required by Sift's API for all currency values.
 	 *
-	 * @param WC_Product $product WooCommerce product.
+	 * @param float $amount The amount to convert to micros.
+	 * @return int The amount in micros (multiplied by 1,000,000).
+	 */
+	private static function get_transaction_micros( float $amount ): int {
+		return (int) ( $amount * 1000000 );
+	}
+
+	/**
+	 * Get the primary category for a product.
 	 *
-	 * @link https://developers.sift.com/docs/curl/events-api/complex-field-types/item
-	 *
-	 * @return string
+	 * @param WC_Product $product The product to get the category for.
+	 * @return string The primary category name, or empty string if none found.
 	 */
 	private static function get_product_category( WC_Product $product ): string {
+		$product_id = $product->get_id();
+		$terms = get_the_terms( $product_id, 'product_cat' );
 
-		$category_ids = wc_get_product_cat_ids( $product->get_id() );
-		if ( empty( $category_ids ) ) {
-			return '';
+		if ( is_array( $terms ) && ! empty( $terms ) ) {
+			// Return the first category name
+			return $terms[0]->name;
 		}
 
-		$taxonomy  = 'product_cat'; // Taxonomy for product category
-		$terms_ids = $product->get_category_ids();
-		// Loop though terms ids (product categories)
-		foreach ( $terms_ids as $term_id ) {
-			$term_names = array(); // Initialising category array
+		return 'Uncategorized';
+	}
 
-			// Loop through product category ancestors
-			foreach ( get_ancestors( $term_id, $taxonomy ) as $ancestor_id ) {
-				// Add the ancestors term names to the category array
-				$term_names[] = get_term( $ancestor_id, $taxonomy )->name;
+	/**
+	 * Get the customer payment methods in the format that Sift expects.
+	 *
+	 * @param int $user_id The User ID.
+	 * @return array An array of payment methods in Sift format.
+	 */
+	private static function get_customer_payment_methods( int $user_id ): array {
+		// If WC Payment Methods is not available, return empty array
+		if ( ! function_exists( 'wc_get_customer_saved_methods_list' ) ) {
+			return array();
+		}
+
+		$payment_methods = array();
+		$saved_methods = wc_get_customer_saved_methods_list( $user_id );
+
+		if ( ! empty( $saved_methods['payment'] ) ) {
+			foreach ( $saved_methods['payment'] as $method ) {
+				$payment_method = array(
+					'$payment_type'    => '$credit_card',
+					'$payment_gateway' => $method['method']['gateway'] ?? '',
+					'$card_bin'        => substr( $method['method']['last4'] ?? '', 0, 6 ),
+					'$card_last4'      => $method['method']['last4'] ?? '',
+				);
+
+				// Add expiration date if available
+				if ( ! empty( $method['expires'] ) ) {
+					$expiry_parts = explode( '/', $method['expires'] );
+					if ( count( $expiry_parts ) === 2 ) {
+						$payment_method['$card_expiry_month'] = $expiry_parts[0];
+						$payment_method['$card_expiry_year'] = $expiry_parts[1];
+					}
+				}
+
+				$payment_methods[] = $payment_method;
 			}
-			// Add the product category term name to the category array
-			$term_names[] = get_term( $term_id, $taxonomy )->name;
-
-			// Add the formatted ancestors with the product category to main array
-			$output[] = implode( ' > ', $term_names );
 		}
-		// Output the formatted product categories with their ancestors
-		return implode( ', ', $output );
+
+		return $payment_methods;
 	}
 }

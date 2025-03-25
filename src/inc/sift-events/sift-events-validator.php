@@ -871,10 +871,16 @@ class SiftEventsValidator {
 			'$size'          => 'is_string',
 		);
 		try {
-			// check required fields: $item_id, $product_title, $price
-			if ( empty( $value['$item_id'] ) || empty( $value['$product_title'] ) || empty( $value['$price'] ) ) {
+			// check required fields: $item_id, $product_title, $price.
+			if (
+				empty( $value['$item_id'] )
+				|| empty( $value['$product_title'] )
+				|| ! isset( $value['$price'] )
+				|| ! is_numeric( $value['$price'] ) // Sometimes $price is 0 due to it being a free download.
+			) {
 				throw new \Exception( 'missing required fields' );
 			}
+
 			static::validate( $value, $validator_map );
 		} catch ( \Exception $e ) {
 			throw new \Exception( 'invalid $item: ' . esc_html( $e->getMessage() ) );
