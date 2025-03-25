@@ -713,6 +713,7 @@ class Events {
 	 * Determine if an order is a free order (zero total)
 	 *
 	 * @param \WC_Order $order The order to check.
+	 *
 	 * @return boolean True if the order is free.
 	 */
 	public static function is_free_order( \WC_Order $order ) {
@@ -1032,6 +1033,8 @@ class Events {
 	 *
 	 * @param string $event      The event to enqueue.
 	 * @param array  $properties The properties to send with the event.
+	 *
+	 * @return void
 	 */
 	public static function add( string $event, array $properties ) {
 		// Give a chance for the platform to modify the data (and add potentially new custom data)
@@ -1272,6 +1275,7 @@ class Events {
 	 * Format a user ID for sending to Sift.
 	 *
 	 * @param integer $user_id The user ID to format.
+	 *
 	 * @return string The formatted user ID.
 	 */
 	private static function format_user_id( int $user_id ): string {
@@ -1289,6 +1293,7 @@ class Events {
 	 * This format is required by Sift's API for all currency values.
 	 *
 	 * @param float $amount The amount to convert to micros.
+	 *
 	 * @return integer The amount in micros (multiplied by 1,000,000).
 	 */
 	private static function get_transaction_micros( float $amount ): int {
@@ -1299,6 +1304,7 @@ class Events {
 	 * Get the primary category for a product.
 	 *
 	 * @param WC_Product $product The product to get the category for.
+	 *
 	 * @return string The primary category name, or empty string if none found.
 	 */
 	private static function get_product_category( WC_Product $product ): string {
@@ -1317,6 +1323,7 @@ class Events {
 	 * Get the customer payment methods in the format that Sift expects.
 	 *
 	 * @param integer $user_id The User ID.
+	 *
 	 * @return array An array of payment methods in Sift format.
 	 */
 	private static function get_customer_payment_methods( int $user_id ): array {
