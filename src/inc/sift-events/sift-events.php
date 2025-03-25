@@ -654,7 +654,7 @@ class Events {
 				'$price'         => self::get_transaction_micros( floatval( $product->get_price() ) ),
 				'$quantity'      => intval( $item->get_quantity() ),
 				'$currency_code' => $order->get_currency(),
-				'$category' => self::get_product_category( $product ) ? self::get_product_category( $product ) : 'Uncategorized',
+				'$category'      => self::get_product_category( $product ) ? self::get_product_category( $product ) : 'Uncategorized',
 			);
 		}
 
@@ -688,9 +688,9 @@ class Events {
 				wc_get_logger()->error(
 					sprintf( 'Validation error for %s event: %s', $event, $e->getMessage() ),
 					array(
-						'source' => 'sift-order-events',
-						'order_id' => $order_id,
-						'properties' => wp_json_encode( $properties )
+						'source'     => 'sift-order-events',
+						'order_id'   => $order_id,
+						'properties' => wp_json_encode( $properties ),
 					)
 				);
 			}
@@ -737,7 +737,7 @@ class Events {
 		}
 
 		// Get user ID and ensure it's never empty.
-		$user_id = $order->get_user_id();
+		$user_id   = $order->get_user_id();
 		$s_user_id = self::format_user_id( intval( $user_id ) );
 
 		// If user ID is empty, try to use email for guest users or generate anonymous ID.
@@ -813,7 +813,6 @@ class Events {
 		if ( $is_free_order &&
 			in_array( $status_transition['to'], array( 'pending', 'processing' ), true ) &&
 			Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_order ) ) {
-
 			if ( function_exists( 'wc_get_logger' ) ) {
 				wc_get_logger()->debug(
 					sprintf( 'Free order detected at status change - triggering create_order event for order %s', $order_id ),
@@ -826,7 +825,7 @@ class Events {
 		}
 
 		// Get user ID and ensure it's never empty.
-		$user_id = $order->get_user_id();
+		$user_id   = $order->get_user_id();
 		$s_user_id = self::format_user_id( intval( $user_id ) );
 
 		// If user ID is empty, try to use email for guest users or generate anonymous ID.
@@ -947,9 +946,9 @@ class Events {
 	 * Logs when an unsupported order status change occurs.
 	 * This is called for order status transitions not explicitly handled by our supported statuses.
 	 *
-	 * @param string    $order_id Order ID.
-	 * @param string    $old_status The old order status.
-	 * @param string    $new_status The new order status.
+	 * @param string $order_id   Order ID.
+	 * @param string $old_status The old order status.
+	 * @param string $new_status The new order status.
 	 *
 	 * @return void
 	 */
@@ -1070,14 +1069,14 @@ class Events {
 			// Log all events that are about to be sent
 			if ( function_exists( 'wc_get_logger' ) ) {
 				$event_types = array_map(
-					function( $entry ) {
+					function ( $entry ) {
 						return $entry['event'];
 					},
 					self::$to_send
 				);
 
 				wc_get_logger()->debug(
-					sprintf( 'Sending %d events to Sift: %s', self::count(), implode(', ', $event_types) ),
+					sprintf( 'Sending %d events to Sift: %s', self::count(), implode( ', ', $event_types ) ),
 					array( 'source' => 'sift-events-send' )
 				);
 			}
@@ -1272,7 +1271,7 @@ class Events {
 	/**
 	 * Format a user ID for sending to Sift.
 	 *
-	 * @param int $user_id The user ID to format.
+	 * @param integer $user_id The user ID to format.
 	 * @return string The formatted user ID.
 	 */
 	private static function format_user_id( int $user_id ): string {
@@ -1290,7 +1289,7 @@ class Events {
 	 * This format is required by Sift's API for all currency values.
 	 *
 	 * @param float $amount The amount to convert to micros.
-	 * @return int The amount in micros (multiplied by 1,000,000).
+	 * @return integer The amount in micros (multiplied by 1,000,000).
 	 */
 	private static function get_transaction_micros( float $amount ): int {
 		return (int) ( $amount * 1000000 );
@@ -1304,7 +1303,7 @@ class Events {
 	 */
 	private static function get_product_category( WC_Product $product ): string {
 		$product_id = $product->get_id();
-		$terms = get_the_terms( $product_id, 'product_cat' );
+		$terms      = get_the_terms( $product_id, 'product_cat' );
 
 		if ( is_array( $terms ) && ! empty( $terms ) ) {
 			// Return the first category name
@@ -1317,7 +1316,7 @@ class Events {
 	/**
 	 * Get the customer payment methods in the format that Sift expects.
 	 *
-	 * @param int $user_id The User ID.
+	 * @param integer $user_id The User ID.
 	 * @return array An array of payment methods in Sift format.
 	 */
 	private static function get_customer_payment_methods( int $user_id ): array {
@@ -1327,7 +1326,7 @@ class Events {
 		}
 
 		$payment_methods = array();
-		$saved_methods = wc_get_customer_saved_methods_list( $user_id );
+		$saved_methods   = wc_get_customer_saved_methods_list( $user_id );
 
 		if ( ! empty( $saved_methods['payment'] ) ) {
 			foreach ( $saved_methods['payment'] as $method ) {
@@ -1343,7 +1342,7 @@ class Events {
 					$expiry_parts = explode( '/', $method['expires'] );
 					if ( count( $expiry_parts ) === 2 ) {
 						$payment_method['$card_expiry_month'] = $expiry_parts[0];
-						$payment_method['$card_expiry_year'] = $expiry_parts[1];
+						$payment_method['$card_expiry_year']  = $expiry_parts[1];
 					}
 				}
 
