@@ -563,6 +563,24 @@ class Events {
 	 * @return void
 	 */
 	public static function update_or_create_order( string $order_id, \WC_Order $order, bool $create_order = false ) {
+		// Add debug logging to see the status
+		if ( function_exists( 'wc_get_logger' ) ) {
+			wc_get_logger()->debug(
+				sprintf( 'Order status check - Status: %s, Create Order: %s', $order->get_status(), $create_order ? 'true' : 'false' ),
+				array( 'source' => 'sift-order-events' )
+			);
+		}
+		// Check for unsupported statuses and log error
+		if ( ! in_array( $order->get_status(), self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
+			if ( function_exists( 'wc_get_logger' ) ) {
+				wc_get_logger()->error(
+					sprintf( 'Unsupported status change from cancelled to %s', $order->get_status() ),
+					array( 'source' => 'sift-order-events' )
+				);
+			}
+			return;
+		}
+
 		$event = $create_order ? Sift_Event_Types::$create_order : Sift_Event_Types::$update_order;
 
 		// Log the event type we're trying to send for debugging.
@@ -586,40 +604,28 @@ class Events {
 
 		$sift_order = Sift_For_WooCommerce::get_sift_order_from_wc_order( $order );
 
-		$user_id    = $order->get_user_id();
-		$user       = get_user_by( 'id', $user_id );
-		$user_email = $order->get_billing_email();
+		// Determine user and session context.
+		$user_id  = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
+		$is_admin = 1 === $user_id;
+		$user_email = wp_get_current_user()->user_email ?? null;
 
-		$ip = $order->get_customer_ip_address() ?? self::get_client_ip();
-
-		// Get user ID and ensure it's never empty.
-		$s_user_id = self::format_user_id( intval( $user_id ) );
-		if ( empty( $s_user_id ) ) {
-			$user_email = $order->get_billing_email();
-			if ( ! empty( $user_email ) ) {
-				// For guest users, use email directly.
-				$s_user_id = $user_email;
-			} else {
-				// Last resort - use anonymous ID based on order ID.
-				$s_user_id = 'anonymous_' . $order_id;
-			}
-
-			// Log this fallback for debugging.
-			if ( function_exists( 'wc_get_logger' ) ) {
-				wc_get_logger()->debug(
-					sprintf( 'Using fallback user ID for order %s in transaction event', $order->get_id() ),
-					array( 'source' => 'sift-transaction' )
-				);
-			}
+		// Figure out if it should use the session ID if no logged-in user exists.
+		if ( ! $user_id || $is_admin ) {
+			$user_id = $order->get_user_id() ?? null; // Use order user ID if it isn't available otherwise
 		}
 
+		$user_id = self::format_user_id( intval( $user_id ) );
+
 		$browser = self::get_client_browser();
+		$ip = $order->get_customer_ip_address() ?? self::get_client_ip();
 
 		$properties = array(
-			'$user_id'            => $s_user_id,
+			'$user_id'            => $user_id,
 			'$session_id'         => WC()->session?->get_customer_unique_id() ?? '',
 			'$order_id'           => $order_id,
 			'$user_email'         => $user_email,
+			'$verification_phone_number'
+				=> '+' === substr( $order->get_billing_phone(), 0, 1 ) ? preg_replace( '/[^0-9\+]/', '', $order->get_billing_phone() ) : null,
 			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ),
 			'$payment_methods'    => $sift_order->get_payment_methods(),
 			'$currency_code'      => $order->get_currency(),
@@ -737,32 +743,21 @@ class Events {
 			return;
 		}
 
-		// Get user ID and ensure it's never empty.
-		$user_id   = $order->get_user_id();
-		$s_user_id = self::format_user_id( intval( $user_id ) );
+		// Determine user and session context.
+		$user_id  = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
+		$is_admin = 1 === $user_id;
+		$user_email = wp_get_current_user()->user_email ?? null;
 
-		// If user ID is empty, try to use email for guest users or generate anonymous ID.
-		if ( empty( $s_user_id ) ) {
-			$user_email = $order->get_billing_email();
-			if ( ! empty( $user_email ) ) {
-				// Format the email to be a valid user ID for guests.
-				$s_user_id = 'guest_' . md5( $user_email );
-			} else {
-				// Last resort - use anonymous ID based on order ID.
-				$s_user_id = 'anonymous_' . md5( $order->get_id() );
-			}
-
-			// Log this fallback for debugging.
-			if ( function_exists( 'wc_get_logger' ) ) {
-				wc_get_logger()->debug(
-					sprintf( 'Using fallback user ID for order %s in transaction event', $order->get_id() ),
-					array( 'source' => 'sift-transaction' )
-				);
-			}
+		// Figure out if it should use the session ID if no logged-in user exists.
+		if ( ! $user_id || $is_admin ) {
+			$user_id = $order->get_user_id() ?? null; // Use order user ID if it isn't available otherwise
 		}
 
+		$user_id = self::format_user_id( intval( $user_id ) );
+
 		$properties = array(
-			'$user_id'            => $s_user_id, // Using our guaranteed user ID.
+			'$user_id'            => $user_id,
+			'$user_email'         => $user_email,
 			'$session_id'         => \WC()->session?->get_customer_unique_id() ?? '',
 			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ),
 			'$currency_code'      => $order->get_currency(),
@@ -802,7 +797,6 @@ class Events {
 	 * @return void
 	 */
 	public static function change_order_status( string $order_id, \WC_Order $order, array $status_transition ) {
-
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$order_status ) ) {
 			return;
 		}
@@ -825,32 +819,19 @@ class Events {
 			self::create_order( $order_id, $order );
 		}
 
-		// Get user ID and ensure it's never empty.
-		$user_id   = $order->get_user_id();
-		$s_user_id = self::format_user_id( intval( $user_id ) );
+		// Determine user and session context.
+		$user_id  = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
+		$is_admin = 1 === $user_id;
 
-		// If user ID is empty, try to use email for guest users or generate anonymous ID.
-		if ( empty( $s_user_id ) ) {
-			$user_email = $order->get_billing_email();
-			if ( ! empty( $user_email ) ) {
-				// Format the email to be a valid user ID for guests.
-				$s_user_id = $user_email;
-			} else {
-				// Last resort - use anonymous ID based on order ID.
-				$s_user_id = 'anonymous_' . md5( $order_id );
-			}
-
-			// Log this fallback for debugging.
-			if ( function_exists( 'wc_get_logger' ) ) {
-				wc_get_logger()->debug(
-					sprintf( 'Using fallback user ID for order %s in order_status event', $order_id ),
-					array( 'source' => 'sift-order-status' )
-				);
-			}
+		// Figure out if it should use the session ID if no logged-in user exists.
+		if ( ! $user_id || $is_admin ) {
+			$user_id = $order->get_user_id() ?? null; // Use order user ID if it isn't available otherwise
 		}
 
+		$user_id = self::format_user_id( intval( $user_id ) );
+
 		$properties = array(
-			'$user_id'      => $s_user_id, // Using our guaranteed user ID.
+			'$user_id'      => $user_id, // Using our guaranteed user ID.
 			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
 			'$order_id'     => $order_id,
 			'$source'       => $status_transition['manual'] ? '$manual_review' : '$automated',
@@ -1296,7 +1277,7 @@ class Events {
 	 *
 	 * @return integer The amount in micros (multiplied by 1,000,000).
 	 */
-	private static function get_transaction_micros( float $amount ): int {
+	public static function get_transaction_micros( float $amount ): int {
 		return (int) ( $amount * 1000000 );
 	}
 

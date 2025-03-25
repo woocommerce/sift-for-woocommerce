@@ -1706,6 +1706,7 @@ class SiftEventsValidator {
 	public static function validate_transaction( array $data ) {
 		$validator_map = array(
 			'$user_id'            => array( __CLASS__, 'validate_id' ),
+			'$user_email'         => array( __CLASS__, 'validate_email' ), 
 			'$session_id'         => array( __CLASS__, 'validate_id' ),
 			'$amount'             => 'is_int',
 			'$currency_code'      => array( __CLASS__, 'validate_currency_code' ),
@@ -1723,14 +1724,14 @@ class SiftEventsValidator {
 			if ( ! isset( $data['$session_id'] ) ) {
 				throw new \Exception( 'missing $session_id' );
 			}
-			if ( empty( $data['$amount'] ) ) {
-				throw new \Exception( 'missing $amount' );
+			if ( ! isset( $data['$amount'] ) || ! is_int( $data['$amount'] ) ) {
+				throw new \Exception( 'missing or invalid $amount' );
 			}
 			if ( empty( $data['$currency_code'] ) ) {
 				throw new \Exception( 'missing $currency_code' );
 			}
 		} catch ( \Exception $e ) {
-			throw new \Exception( 'Invalid $order_status event: ' . esc_html( $e->getMessage() ) );
+			throw new \Exception( 'Invalid $transaction event: ' . esc_html( $e->getMessage() ) );
 		}
 
 		return true;
