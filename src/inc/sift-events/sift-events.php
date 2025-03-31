@@ -134,7 +134,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_add_promotion( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -176,7 +176,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_login( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -233,7 +233,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_login( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -282,7 +282,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_create_account( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -340,7 +340,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_update_account( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -382,7 +382,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_update_password( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -415,7 +415,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_link_session_to_user( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -471,7 +471,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_add_item_to_cart( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -571,12 +571,11 @@ class Events {
 		);
 		// Check for unsupported statuses and log error
 		if ( ! in_array( $order->get_status(), self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
-			if ( function_exists( 'wc_get_logger' ) ) {
-				wc_get_logger()->error(
-					sprintf( 'Unsupported status change from cancelled to %s', $order->get_status() ),
-					array( 'source' => 'sift-order-events' )
-				);
-			}
+			Sift_For_WooCommerce::log(
+				sprintf( 'Unsupported status change from cancelled to %s', $order->get_status() ),
+				'error',
+				array( 'source' => 'sift-order-events' )
+			);
 			return;
 		}
 
@@ -638,9 +637,9 @@ class Events {
 			$product = $item->get_product();
 
 			Sift_For_WooCommerce::log(
-				$product,
+				sprintf( 'Product: %s', $product ),
 				'debug',
-				array( 'source' => 'sift-free-orders-product' )
+				array( 'source' => 'sift-order-product' )
 			);
 
 			if ( ! ( $product instanceof WC_Product ) ) {
@@ -678,24 +677,22 @@ class Events {
 			SiftEventsValidator::validate_create_or_update_order( $properties );
 
 			// Log successful validation.
-			if ( function_exists( 'wc_get_logger' ) ) {
-				wc_get_logger()->debug(
-					sprintf( 'Successfully validated %s event for order %s, adding to queue', $event, $order_id ),
-					array( 'source' => 'sift-order-events' )
-				);
-			}
+			Sift_For_WooCommerce::log(
+				sprintf( 'Successfully validated %s event for order %s, adding to queue', $event, $order_id ),
+				'debug',
+				array( 'source' => 'sift-order-events' )
+			);
 		} catch ( \Exception $e ) {
 			// Log validation error in detail.
-			if ( function_exists( 'wc_get_logger' ) ) {
-				wc_get_logger()->error(
-					sprintf( 'Validation error for %s event: %s', $event, $e->getMessage() ),
-					array(
-						'source'     => 'sift-order-events',
-						'order_id'   => $order_id,
-						'properties' => wp_json_encode( $properties ),
-					)
-				);
-			}
+			Sift_For_WooCommerce::log(
+				sprintf( 'Validation error for %s event: %s', $event, $e->getMessage() ),
+				'error',
+				array(
+					'source'     => 'sift-order-events',
+					'order_id'   => $order_id,
+					'properties' => wp_json_encode( $properties ),
+				)
+			);
 			return;
 		}
 
@@ -703,12 +700,11 @@ class Events {
 		self::add( $event, $properties );
 
 		// Log successful queue addition.
-		if ( function_exists( 'wc_get_logger' ) ) {
-			wc_get_logger()->debug(
-				sprintf( 'Successfully added %s event for order %s to queue', $event, $order_id ),
-				array( 'source' => 'sift-order-events' )
-			);
-		}
+		Sift_For_WooCommerce::log(
+			sprintf( 'Successfully added %s event for order %s to queue', $event, $order_id ),
+			'debug',
+			array( 'source' => 'sift-order-events' )
+		);
 	}
 
 	/**
@@ -756,7 +752,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_transaction( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 
 			return;
 		}
@@ -788,12 +784,11 @@ class Events {
 		if ( $is_free_order &&
 			in_array( $status_transition['to'], array( 'pending', 'processing' ), true ) &&
 			Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_order ) ) {
-			if ( function_exists( 'wc_get_logger' ) ) {
-				wc_get_logger()->debug(
-					sprintf( 'Free order detected at status change - triggering create_order event for order %s', $order_id ),
-					array( 'source' => 'sift-free-orders' )
-				);
-			}
+			Sift_For_WooCommerce::log(
+				sprintf( 'Free order detected at status change - triggering create_order event for order %s', $order_id ),
+				'debug',
+				array( 'source' => 'sift-free-orders' )
+			);
 
 			// This will trigger the create_order event for this free order.
 			self::create_order( $order_id, $order );
@@ -861,7 +856,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_order_status( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -896,7 +891,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_chargeback( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -921,12 +916,11 @@ class Events {
 		}
 
 		// Log the unsupported status change.
-		if ( function_exists( 'wc_get_logger' ) ) {
-			wc_get_logger()->info(
-				sprintf( 'Unsupported order status change for order %s from %s to %s', $order_id, $old_status, $new_status ),
-				array( 'source' => 'sift-order-events' )
-			);
-		}
+		Sift_For_WooCommerce::log(
+			sprintf( 'Unsupported order status change for order %s from %s to %s', $order_id, $old_status, $new_status ),
+			'info',
+			array( 'source' => 'sift-order-events' )
+		);
 	}
 
 	/**
@@ -940,8 +934,9 @@ class Events {
 	public static function get_decision( string $sift_user_id, string $wccom_user_id ): ?string {
 		$client = \Sift_For_WooCommerce\Sift_For_WooCommerce::get_api_client();
 		if ( empty( $client ) ) {
-			wc_get_logger()->error(
+			Sift_For_WooCommerce::log(
 				'Failed to get the Sift API client.',
+				'error',
 				array(
 					'source' => 'sift-events',
 				)
@@ -956,8 +951,9 @@ class Events {
 
 		// If $user_decisions_response->body['decisions'] is empty, log the info.
 		if ( empty( $user_decisions_response->body['decisions'] ) ) {
-			wc_get_logger()->info(
+			Sift_For_WooCommerce::log(
 				'No decisions found for user',
+				'info',
 				array(
 					'source'       => 'sift-events',
 					'sift_user_id' => $sift_user_id,
@@ -1038,16 +1034,18 @@ class Events {
 					self::$to_send
 				);
 
-				wc_get_logger()->debug(
+				Sift_For_WooCommerce::log(
 					sprintf( 'Sending %d events to Sift: %s', self::count(), implode( ', ', $event_types ) ),
+					'debug',
 					array( 'source' => 'sift-events-send' )
 				);
 			}
 
 			$client = \Sift_For_WooCommerce\Sift_For_WooCommerce::get_api_client();
 			if ( empty( $client ) ) {
-				wc_get_logger()->error(
+				Sift_For_WooCommerce::log(
 					'Failed to send events to Sift',
+					'error',
 					array(
 						'source' => 'sift-for-woocommerce',
 						'reason' => 'Failed to get the Sift API client.',
@@ -1071,9 +1069,9 @@ class Events {
 					$log_title .= sprintf( ', Error %d: %s', $response->apiStatus, $response->apiErrorMessage );
 				}
 
-				wc_get_logger()->log(
-					$log_type,
+				Sift_For_WooCommerce::log(
 					$log_title,
+					$log_type,
 					array(
 						'source'     => 'sift-for-woocommerce',
 						'properties' => $entry['properties'],
@@ -1261,22 +1259,40 @@ class Events {
 	}
 
 	/**
-	 * Get the primary category for a product.
+	 * Return the hierarchy of the product category
 	 *
-	 * @param WC_Product $product The product to get the category for.
+	 * @param WC_Product $product WooCommerce product.
 	 *
-	 * @return string The primary category name, or empty string if none found.
+	 * @link https://developers.sift.com/docs/curl/events-api/complex-field-types/item
+	 *
+	 * @return string The formatted product category, or Uncategorized if no category is found.
 	 */
 	private static function get_product_category( WC_Product $product ): string {
-		$product_id = $product->get_id();
-		$terms      = get_the_terms( $product_id, 'product_cat' );
 
-		if ( is_array( $terms ) && ! empty( $terms ) ) {
-			// Return the first category name
-			return $terms[0]->name;
+		$category_ids = wc_get_product_cat_ids( $product->get_id() );
+		if ( empty( $category_ids ) ) {
+			return 'Uncategorized';
 		}
 
-		return 'Uncategorized';
+		$taxonomy  = 'product_cat'; // Taxonomy for product category
+		$terms_ids = $product->get_category_ids();
+		// Loop though terms ids (product categories)
+		foreach ( $terms_ids as $term_id ) {
+			$term_names = array(); // Initialising category array
+
+			// Loop through product category ancestors
+			foreach ( get_ancestors( $term_id, $taxonomy ) as $ancestor_id ) {
+				// Add the ancestors term names to the category array
+				$term_names[] = get_term( $ancestor_id, $taxonomy )->name;
+			}
+			// Add the product category term name to the category array
+			$term_names[] = get_term( $term_id, $taxonomy )->name;
+
+			// Add the formatted ancestors with the product category to main array
+			$output[] = implode( ' > ', $term_names );
+		}
+		// Output the formatted product categories with their ancestors
+		return implode( ', ', $output );
 	}
 
 	/**
