@@ -564,12 +564,11 @@ class Events {
 	 */
 	public static function update_or_create_order( string $order_id, \WC_Order $order, bool $create_order = false ) {
 		// Add debug logging to see the status
-		if ( function_exists( 'wc_get_logger' ) ) {
-			wc_get_logger()->debug(
-				sprintf( 'Order status check - Status: %s, Create Order: %s', $order->get_status(), $create_order ? 'true' : 'false' ),
-				array( 'source' => 'sift-order-events' )
-			);
-		}
+		Sift_For_WooCommerce::log(
+			sprintf( 'Order status check - Status: %s, Create Order: %s', $order->get_status(), $create_order ? 'true' : 'false' ),
+			'debug',
+			array( 'source' => 'sift-order-events' )
+		);
 		// Check for unsupported statuses and log error
 		if ( ! in_array( $order->get_status(), self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
 			if ( function_exists( 'wc_get_logger' ) ) {
@@ -584,21 +583,19 @@ class Events {
 		$event = $create_order ? Sift_Event_Types::$create_order : Sift_Event_Types::$update_order;
 
 		// Log the event type we're trying to send for debugging.
-		if ( function_exists( 'wc_get_logger' ) ) {
-			wc_get_logger()->debug(
-				sprintf( 'Preparing to send %s event for order %s', $event, $order_id ),
-				array( 'source' => 'sift-order-events' )
-			);
-		}
+		Sift_For_WooCommerce::log(
+			sprintf( 'Preparing to send %s event for order %s', $event, $order_id ),
+			'debug',
+			array( 'source' => 'sift-order-events' )
+		);
 
 		if ( ! Sift_Event_Types::can_event_be_sent( $event ) ) {
 			// Log when event can't be sent due to settings.
-			if ( function_exists( 'wc_get_logger' ) ) {
-				wc_get_logger()->debug(
-					sprintf( 'Event %s disabled for order %s', $event, $order_id ),
-					array( 'source' => 'sift-order-events' )
-				);
-			}
+			Sift_For_WooCommerce::log(
+				sprintf( 'Event %s disabled for order %s', $event, $order_id ),
+				'debug',
+				array( 'source' => 'sift-order-events' )
+			);
 			return;
 		}
 
@@ -640,8 +637,9 @@ class Events {
 		foreach ( $order->get_items() as $item ) {
 			$product = $item->get_product();
 
-			wc_get_logger()->debug(
+			Sift_For_WooCommerce::log(
 				$product,
+				'debug',
 				array( 'source' => 'sift-free-orders-product' )
 			);
 
@@ -739,38 +737,21 @@ class Events {
 	 * @return void
 	 */
 	public static function transaction( \WC_Order $order, string $status, string $transaction_type ) {
-		// $transaction requires a positive amount, so we don't send it for free orders.
-		if ( self::is_free_order( $order ) || ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$transaction ) ) {
+
+		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$transaction ) ) {
 			return;
 		}
 
-		// Determine user and session context.
-		$user_id    = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$user_id    = self::format_user_id( intval( $user_id ) );
-		$user_email = wp_get_current_user()->user_email ?? $order->get_billing_email() ?? null;
-
-		// If there is no user ID, fall back to the billing email as the user ID.
-		if ( ! $user_id ) {
-			$user_id = $user_email;
-		}
-
 		$properties = array(
-			'$user_id'            => $user_id,
-			'$user_email'         => $user_email,
+			'$user_id'            => self::format_user_id( $order->get_user_id() ),
 			'$session_id'         => \WC()->session?->get_customer_unique_id() ?? '',
-			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ),
+			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ), // Gotta multiply it up to give an integer.
 			'$currency_code'      => $order->get_currency(),
 			'$order_id'           => (string) $order->get_id(),
 			'$transaction_type'   => $transaction_type,
 			'$transaction_status' => $status,
 			'$time'               => intval( 1000 * microtime( true ) ),
 		);
-
-		// If the session ID is empty, create one from the order ID.
-		// This ensures we always have a session ID even for admin-created orders.
-		if ( empty( $properties['$session_id'] ) ) {
-			$properties['$session_id'] = md5( 'order_session_' . $order->get_id() );
-		}
 
 		try {
 			SiftEventsValidator::validate_transaction( $properties );
