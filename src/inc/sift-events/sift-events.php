@@ -600,24 +600,14 @@ class Events {
 
 		$sift_order = Sift_For_WooCommerce::get_sift_order_from_wc_order( $order );
 
-		// Determine user and session context.
-		$user_id    = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$user_id    = self::format_user_id( intval( $user_id ) );
-		$user_email = wp_get_current_user()->user_email ?? $order->get_billing_email() ?? null;
-
-		// If there is no user ID, fall back to the billing email as the user ID.
-		if ( ! $user_id ) {
-			$user_id = $user_email;
-		}
-
 		$browser = self::get_client_browser();
 		$ip      = $order->get_customer_ip_address() ?? self::get_client_ip();
 
 		$properties = array(
-			'$user_id'            => $user_id,
+			'$user_id'            => self::format_user_id( $order->get_user_id() ),
 			'$session_id'         => WC()->session?->get_customer_unique_id() ?? '',
 			'$order_id'           => $order_id,
-			'$user_email'         => $user_email,
+			'$user_email'         => $order->get_billing_email(),
 			'$verification_phone_number'
 				=> '+' === substr( $order->get_billing_phone(), 0, 1 ) ? preg_replace( '/[^0-9\+]/', '', $order->get_billing_phone() ) : null,
 			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ),
@@ -738,6 +728,11 @@ class Events {
 			return;
 		}
 
+		// If the order is a free order, we don't need to send the transaction event.
+		if ( self::is_free_order( $order ) ) {
+			return;
+		}
+
 		$properties = array(
 			'$user_id'            => self::format_user_id( $order->get_user_id() ),
 			'$session_id'         => \WC()->session?->get_customer_unique_id() ?? '',
@@ -794,18 +789,8 @@ class Events {
 			self::create_order( $order_id, $order );
 		}
 
-		// Determine user and session context.
-		$user_id    = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$user_id    = self::format_user_id( intval( $user_id ) );
-		$user_email = wp_get_current_user()->user_email ?? $order->get_billing_email() ?? null;
-
-		// If there is no user ID, fall back to the billing email as the user ID.
-		if ( ! $user_id ) {
-			$user_id = $user_email;
-		}
-
 		$properties = array(
-			'$user_id'      => $user_id, // Using our guaranteed user ID.
+			'$user_id'      => self::format_user_id( $order->get_user_id() ),
 			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
 			'$order_id'     => $order_id,
 			'$source'       => $status_transition['manual'] ? '$manual_review' : '$automated',
