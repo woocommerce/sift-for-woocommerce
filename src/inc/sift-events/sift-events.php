@@ -728,11 +728,6 @@ class Events {
 			return;
 		}
 
-		// If the order is a free order, we don't need to send the transaction event.
-		if ( self::is_free_order( $order ) ) {
-			return;
-		}
-
 		$properties = array(
 			'$user_id'            => self::format_user_id( $order->get_user_id() ),
 			'$session_id'         => \WC()->session?->get_customer_unique_id() ?? '',
@@ -748,7 +743,6 @@ class Events {
 			SiftEventsValidator::validate_transaction( $properties );
 		} catch ( \Exception $e ) {
 			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-
 			return;
 		}
 
@@ -989,7 +983,12 @@ class Events {
 			self::$to_send,
 			array(
 				'event'      => $event,
-				'properties' => array_filter( $properties ),
+				'properties' => array_filter(
+					$properties,
+					function ( $value ) {
+						return null !== $value && '' !== $value;
+					}
+				),
 			)
 		);
 	}
