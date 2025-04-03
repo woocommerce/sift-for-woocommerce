@@ -155,4 +155,24 @@ class Sift_For_WooCommerce {
 	}
 
 	// endregion
+
+	/**
+	 * Log a message using WooCommerce's logger if available
+	 *
+	 * @param string $message The message to log.
+	 * @param string $level   The logging level (debug, info, error, etc.).
+	 * @param array  $context Additional context data to log.
+	 *
+	 * @return void
+	 */
+	public static function log( string $message, string $level = 'debug', array $context = array() ): void {
+		if ( ! function_exists( 'wc_get_logger' ) ) {
+			return;
+		}
+
+		// Ensure source is always set
+		$context['source'] = $context['source'] ?? 'sift-events';
+
+		wc_get_logger()->log( $level, $message, $context );
+	}
 }

@@ -41,7 +41,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function init_hooks() {
+	public static function init_hooks(): void {
 		add_action( 'wp_logout', array( static::class, 'logout' ), 100 );
 		add_action( 'wp_login', array( static::class, 'login_success' ), 100, 2 );
 		add_action( 'wp_login_failed', array( static::class, 'login_failure' ), 100, 2 );
@@ -85,7 +85,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function logout( string $user_id ) {
+	public static function logout( string $user_id ): void {
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$logout ) ) {
 			return;
 		}
@@ -134,7 +134,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_add_promotion( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -151,7 +151,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function login_success( string $username, object $user ) {
+	public static function login_success( string $username, object $user ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$login ) ) {
 			return;
@@ -176,7 +176,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_login( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -193,7 +193,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function login_failure( string $username, \WP_Error $error ) {
+	public static function login_failure( string $username, \WP_Error $error ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$login ) ) {
 			return;
@@ -233,7 +233,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_login( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -253,7 +253,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function create_account( string $user_id ) {
+	public static function create_account( string $user_id ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_account ) ) {
 			return;
@@ -282,7 +282,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_create_account( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -303,7 +303,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function update_account( string $user_id, ?\WP_User $old_user_data = null, ?array $new_user_data = null ) {
+	public static function update_account( string $user_id, ?\WP_User $old_user_data = null, ?array $new_user_data = null ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$update_account ) ) {
 			return;
@@ -340,7 +340,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_update_account( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -357,7 +357,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function update_password( string $new_password, string $user_id ) {
+	public static function update_password( string $new_password, string $user_id ): void {
 
 		// We are immediately setting this to null, so that it is not inadvertently shared or disclosed.
 		$new_password = null;
@@ -382,7 +382,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_update_password( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -399,7 +399,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function link_session_to_user( string $session_id, string $user_id ) {
+	public static function link_session_to_user( string $session_id, string $user_id ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$link_session_to_user ) ) {
 			return;
@@ -415,7 +415,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_link_session_to_user( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -431,7 +431,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function add_to_cart( string $cart_item_key ) {
+	public static function add_to_cart( string $cart_item_key ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$add_item_to_cart ) ) {
 			return;
@@ -471,7 +471,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_add_item_to_cart( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -491,7 +491,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function remove_item_from_cart( string $cart_item_key, \WC_Cart $cart ) {
+	public static function remove_item_from_cart( string $cart_item_key, \WC_Cart $cart ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$remove_item_from_cart ) ) {
 			return;
@@ -539,8 +539,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function create_order( string $order_id, \WC_Order $order ) {
-
+	public static function create_order( string $order_id, \WC_Order $order ): void {
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_order ) ) {
 			return;
 		}
@@ -563,103 +562,153 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function update_or_create_order( string $order_id, \WC_Order $order, bool $create_order = false ) {
+	public static function update_or_create_order( string $order_id, \WC_Order $order, bool $create_order = false ): void {
+		// Add debug logging to see the status
+		Sift_For_WooCommerce::log(
+			sprintf( 'Order status check - Status: %s, Create Order: %s', $order->get_status(), $create_order ? 'true' : 'false' ),
+			'debug',
+			array( 'source' => 'sift-order-events' )
+		);
+		// Check for unsupported statuses and log error
 		if ( ! in_array( $order->get_status(), self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
-			return;
-		}
-
-		if ( ! $create_order && ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$update_order ) ) { // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound
-			return;
-		}
-
-		// Determine user and session context.
-		$user_id  = wp_get_current_user()->ID ?? null; // Check first for logged-in user.
-		$is_admin = 1 === $user_id;
-
-		// Figure out if it should use the session ID if no logged-in user exists.
-		if ( ! $user_id || $is_admin ) {
-			$user_id = $order->get_user_id() ?? null; // Use order user ID if it isn't available otherwise
-		}
-
-		$physical_or_electronic = '$electronic';
-		$items                  = array();
-		foreach ( $order->get_items( 'line_item' ) as $item ) {
-			if ( ! $item instanceof WC_Order_Item_Product ) {
-				// log an error...
-				wc_get_logger()->error( sprintf( 'Item not Item Product (order: %d).', $order->get_id() ) );
-				continue;
-			}
-			// Most of this we're basing off return value from `WC_Order_Item_Product::get_product()` as it will return the correct variation.
-			$product = $item->get_product();
-			if ( empty( $product ) ) {
-				// log an error...
-				wc_get_logger()->error( sprintf( 'Product not found for order %d.', $order->get_id() ) );
-				continue;
-			}
-
-			$items[] = array(
-				'$item_id'       => (string) $product->get_id(),
-				'$sku'           => $product->get_sku(),
-				'$product_title' => $product->get_name(),
-				'$price'         => self::get_transaction_micros( floatval( $product->get_price() ) ),
-				'$currency_code' => $order->get_currency(), // For the order specifically, not the whole store.
-				'$quantity'      => $item->get_quantity(),
-				'$category'      => self::get_product_category( $product ),
-				'$tags'          => wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' ),
+			Sift_For_WooCommerce::log(
+				sprintf( 'Unsupported status change from cancelled to %s', $order->get_status() ),
+				'error',
+				array( 'source' => 'sift-order-events' )
 			);
-
-			if ( ! $product->is_virtual() ) {
-				$physical_or_electronic = '$physical';
-			}
+			return;
 		}
 
-		$properties = array(
-			'$user_id'         => '',
-			'$user_email'      => $order->get_billing_email() ? $order->get_billing_email() : null, // pulling the billing email for the order, NOT customer email
-			'$session_id'      => \WC()->session?->get_customer_unique_id() ?? '',
-			'$order_id'        => $order_id,
-			'$verification_phone_number'
-				=> '+' === substr( $order->get_billing_phone(), 0, 1 ) ? preg_replace( '/[^0-9\+]/', '', $order->get_billing_phone() ) : null,
-			'$amount'          => self::get_transaction_micros( floatval( $order->get_total() ) ),
-			'$currency_code'   => get_woocommerce_currency(),
-			'$items'           => $items,
-			'$payment_methods' => self::get_order_payment_methods( $order ),
-			'$shipping_method' => $physical_or_electronic,
-			'$browser'         => self::get_client_browser(),
-			'$site_domain'     => wp_parse_url( site_url(), PHP_URL_HOST ),
-			'$site_country'    => wc_get_base_location()['country'],
-			'$ip'              => self::get_client_ip(),
-			'$time'            => intval( 1000 * microtime( true ) ),
+		$event = $create_order ? Sift_Event_Types::$create_order : Sift_Event_Types::$update_order;
+
+		// Log the event type we're trying to send for debugging.
+		Sift_For_WooCommerce::log(
+			sprintf( 'Preparing to send %s event for order %s', $event, $order_id ),
+			'debug',
+			array( 'source' => 'sift-order-events' )
 		);
 
-		// Add the user_id only if a user exists, otherwise, let it remain empty.
-		// Ref: https://developers.sift.com/docs/php/apis-overview/core-topics/faq/tracking-users
-		if ( $user_id && ! $is_admin ) {
-			$properties['$user_id'] = self::format_user_id( $user_id );
+		if ( ! Sift_Event_Types::can_event_be_sent( $event ) ) {
+			// Log when event can't be sent due to settings.
+			Sift_For_WooCommerce::log(
+				sprintf( 'Event %s disabled for order %s', $event, $order_id ),
+				'debug',
+				array( 'source' => 'sift-order-events' )
+			);
+			return;
 		}
 
-		// Add in the address information if it's available.
-		$billing_address = self::get_order_address( $order_id, 'billing' );
-		if ( ! empty( $billing_address ) ) {
-			$properties['$billing_address'] = $billing_address;
+		$sift_order = Sift_For_WooCommerce::get_sift_order_from_wc_order( $order );
+
+		$browser = self::get_client_browser();
+		$ip      = $order->get_customer_ip_address() ?? self::get_client_ip();
+
+		$properties = array(
+			'$user_id'            => self::format_user_id( $order->get_user_id() ),
+			'$session_id'         => WC()->session?->get_customer_unique_id() ?? '',
+			'$order_id'           => $order_id,
+			'$user_email'         => $order->get_billing_email(),
+			'$verification_phone_number'
+				=> str_starts_with( $order->get_billing_phone(), '+' ) ? preg_replace( '/[^0-9+]/', '', $order->get_billing_phone() ) : null,
+			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ),
+			'$payment_methods'    => $sift_order->get_payment_methods(),
+			'$currency_code'      => $order->get_currency(),
+			'$billing_address'    => self::get_order_address( $order_id, 'billing' ),
+			'$shipping_address'   => self::get_order_address( $order_id, 'shipping' ),
+			'$expedited_shipping' => false,
+			'$items'              => array(),
+			'$browser'            => $browser,
+			'$ip'                 => $ip,
+			'$time'               => intval( 1000 * microtime( true ) ),
+		);
+
+		// Add the meta data.
+		foreach ( $order->get_items() as $item ) {
+			$product = $item->get_product();
+
+			Sift_For_WooCommerce::log(
+				sprintf( 'Product: %s', $product ),
+				'debug',
+				array( 'source' => 'sift-order-product' )
+			);
+
+			if ( ! ( $product instanceof WC_Product ) ) {
+				continue;
+			}
+
+			$sku = empty( $product->get_sku() ) ? $product->get_id() : $product->get_sku();
+
+			// Construct item with ONLY fields specified in Sift API documentation.
+			$properties['$items'][] = array(
+				'$item_id'       => (string) $sku,
+				'$product_title' => $product->get_name(),
+				'$price'         => self::get_transaction_micros( floatval( $product->get_price() ) ),
+				'$quantity'      => intval( $item->get_quantity() ),
+				'$currency_code' => $order->get_currency(),
+				'$category'      => self::get_product_category( $product ) ? self::get_product_category( $product ) : 'Uncategorized',
+			);
 		}
 
-		$shipping_address = self::get_order_address( $order_id, 'shipping' );
-		if ( ! empty( $shipping_address ) ) {
-			$properties['$shipping_address'] = $shipping_address;
+		// Detect free orders.
+		$is_free_order = self::is_free_order( $order );
+
+		// Handle free orders by making required adjustments to properties.
+		if ( $is_free_order ) {
+			// Remove payment methods entirely for free orders.
+			unset( $properties['$payment_methods'] );
+		}
+
+		// If session ID is empty, create one for this order.
+		if ( empty( $properties['$session_id'] ) ) {
+			$properties['$session_id'] = 'order_session_' . $order_id;
 		}
 
 		try {
 			SiftEventsValidator::validate_create_or_update_order( $properties );
+
+			// Log successful validation.
+			Sift_For_WooCommerce::log(
+				sprintf( 'Successfully validated %s event for order %s, adding to queue', $event, $order_id ),
+				'debug',
+				array( 'source' => 'sift-order-events' )
+			);
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			// Log validation error in detail.
+			Sift_For_WooCommerce::log(
+				sprintf( 'Validation error for %s event: %s', $event, $e->getMessage() ),
+				'error',
+				array(
+					'source'     => 'sift-order-events',
+					'order_id'   => $order_id,
+					'properties' => wp_json_encode( $properties ),
+				)
+			);
 			return;
 		}
 
-		self::add(
-			$create_order ? Sift_Event_Types::$create_order : Sift_Event_Types::$update_order,
-			$properties
+		// Add event to queue.
+		self::add( $event, $properties );
+
+		// Log successful queue addition.
+		Sift_For_WooCommerce::log(
+			sprintf( 'Successfully added %s event for order %s to queue', $event, $order_id ),
+			'debug',
+			array( 'source' => 'sift-order-events' )
 		);
+	}
+
+	/**
+	 * Determine if an order is a free order (zero total)
+	 *
+	 * @param \WC_Order $order The order to check.
+	 *
+	 * @return boolean True if the order is free.
+	 */
+	public static function is_free_order( \WC_Order $order ): bool {
+		$total = $order->get_total();
+
+		// If the total is 0 or 0.00, it's a free order.
+		return 0.0 === $total;
 	}
 
 	/**
@@ -673,7 +722,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function transaction( \WC_Order $order, string $status, string $transaction_type ) {
+	public static function transaction( \WC_Order $order, string $status, string $transaction_type ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$transaction ) ) {
 			return;
@@ -693,14 +742,12 @@ class Events {
 		try {
 			SiftEventsValidator::validate_transaction( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
-
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
 		self::add( Sift_Event_Types::$transaction, $properties );
 	}
-
 
 	/**
 	 * Adds the event for the order status update
@@ -714,10 +761,26 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function change_order_status( string $order_id, \WC_Order $order, array $status_transition ) {
-
+	public static function change_order_status( string $order_id, \WC_Order $order, array $status_transition ): void {
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$order_status ) ) {
 			return;
+		}
+
+		// Check if this is a free order and if we should send a create_order event too.
+		$is_free_order = self::is_free_order( $order );
+
+		// For free orders that are just being created (moving to pending/processing), send the create_order event.
+		if ( $is_free_order &&
+			in_array( $status_transition['to'], array( 'pending', 'processing' ), true ) &&
+			Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_order ) ) {
+			Sift_For_WooCommerce::log(
+				sprintf( 'Free order detected at status change - triggering create_order event for order %s', $order_id ),
+				'debug',
+				array( 'source' => 'sift-free-orders' )
+			);
+
+			// This will trigger the create_order event for this free order.
+			self::create_order( $order_id, $order );
 		}
 
 		$properties = array(
@@ -758,6 +821,12 @@ class Events {
 				break;
 		}
 
+		// If the session ID is empty, create one from the order ID.
+		// This ensures we always have a session ID even for admin-created orders.
+		if ( empty( $properties['$session_id'] ) ) {
+			$properties['$session_id'] = md5( 'order_session_' . $order_id );
+		}
+
 		// For manual reviews add the user as the `$analyst`.
 		if ( $status_transition['manual'] ?? false ) {
 			$properties['$analyst'] = wp_get_current_user()->user_login;
@@ -766,7 +835,7 @@ class Events {
 		try {
 			SiftEventsValidator::validate_order_status( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
@@ -784,7 +853,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function chargeback( string $order_id, \WC_Order $order, string $chargeback_reason ) {
+	public static function chargeback( string $order_id, \WC_Order $order, string $chargeback_reason ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$chargeback ) ) {
 			return;
@@ -801,11 +870,36 @@ class Events {
 		try {
 			SiftEventsValidator::validate_chargeback( $properties );
 		} catch ( \Exception $e ) {
-			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
 			return;
 		}
 
 		self::add( Sift_Event_Types::$chargeback, $properties );
+	}
+
+	/**
+	 * Logs when an unsupported order status change occurs.
+	 * This is called for order status transitions not explicitly handled by our supported statuses.
+	 *
+	 * @param string $order_id   Order ID.
+	 * @param string $old_status The old order status.
+	 * @param string $new_status The new order status.
+	 *
+	 * @return void
+	 */
+	public static function maybe_log_change_order_status( string $order_id, string $old_status, string $new_status ): void {
+		// Check if this is a supported status change that would be caught by our other hook.
+		if ( in_array( $new_status, self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
+			// This status change will be handled by the dedicated hook, so we can skip.
+			return;
+		}
+
+		// Log the unsupported status change.
+		Sift_For_WooCommerce::log(
+			sprintf( 'Unsupported order status change for order %s from %s to %s', $order_id, $old_status, $new_status ),
+			'info',
+			array( 'source' => 'sift-order-events' )
+		);
 	}
 
 	/**
@@ -819,8 +913,9 @@ class Events {
 	public static function get_decision( string $sift_user_id, string $wccom_user_id ): ?string {
 		$client = \Sift_For_WooCommerce\Sift_For_WooCommerce::get_api_client();
 		if ( empty( $client ) ) {
-			wc_get_logger()->error(
+			Sift_For_WooCommerce::log(
 				'Failed to get the Sift API client.',
+				'error',
 				array(
 					'source' => 'sift-events',
 				)
@@ -835,8 +930,9 @@ class Events {
 
 		// If $user_decisions_response->body['decisions'] is empty, log the info.
 		if ( empty( $user_decisions_response->body['decisions'] ) ) {
-			wc_get_logger()->info(
+			Sift_For_WooCommerce::log(
 				'No decisions found for user',
+				'info',
 				array(
 					'source'       => 'sift-events',
 					'sift_user_id' => $sift_user_id,
@@ -860,22 +956,22 @@ class Events {
 	 * @param string $decision_id The decision ID.
 	 * @param string $user_id     The user ID.
 	 *
-	 * @return void
+	 * @return string|null The decision ID or null if no decision ID was provided.
 	 */
-	public static function apply_decision( string $decision_id, string $user_id ) {
+	public static function apply_decision( string $decision_id, string $user_id ): ?string {
 		\apply_filters( 'sift_decision_received', null, $decision_id, $user_id );
+		return $decision_id;
 	}
 
-
 	/**
-	 * Enqueue an event to send.  This will enable sending them all at shutdown.
+	 * Add a Sift Event to the queue.
 	 *
-	 * @param string $event      The event we're recording -- generally will start with a $.
-	 * @param array  $properties An array of the data we're passing along to Sift.  Keys will generally start with a $.
+	 * @param string $event      The event to enqueue.
+	 * @param array  $properties The properties to send with the event.
 	 *
 	 * @return void
 	 */
-	public static function add( string $event, array $properties ) {
+	public static function add( string $event, array $properties ): void {
 		// Give a chance for the platform to modify the data (and add potentially new custom data)
 		$properties = apply_filters( 'sift_for_woocommerce_pre_send_event_properties', $properties, $event );
 
@@ -883,12 +979,14 @@ class Events {
 			return;
 		}
 
-		array_push(
-			self::$to_send,
-			array(
-				'event'      => $event,
-				'properties' => array_filter( $properties ),
-			)
+		self::$to_send[] = array(
+			'event'      => $event,
+			'properties' => array_filter(
+				$properties,
+				function ( $value ) {
+					return null !== $value && '' !== $value;
+				}
+			),
 		);
 	}
 
@@ -897,7 +995,7 @@ class Events {
 	 *
 	 * @return integer
 	 */
-	private static function count() {
+	private static function count(): int {
 		return count( self::$to_send );
 	}
 
@@ -906,12 +1004,29 @@ class Events {
 	 *
 	 * @return boolean
 	 */
-	public static function send() {
+	public static function send(): bool {
 		if ( self::count() > 0 ) {
-			$client = \Sift_For_WooCommerce\Sift_For_WooCommerce::get_api_client();
+			// Log all events that are about to be sent
+			if ( function_exists( 'wc_get_logger' ) ) {
+				$event_types = array_map(
+					function ( $entry ) {
+						return $entry['event'];
+					},
+					self::$to_send
+				);
+
+				Sift_For_WooCommerce::log(
+					sprintf( 'Sending %d events to Sift: %s', self::count(), implode( ', ', $event_types ) ),
+					'debug',
+					array( 'source' => 'sift-events-send' )
+				);
+			}
+
+			$client = Sift_For_WooCommerce::get_api_client();
 			if ( empty( $client ) ) {
-				wc_get_logger()->error(
+				Sift_For_WooCommerce::log(
 					'Failed to send events to Sift',
+					'error',
 					array(
 						'source' => 'sift-for-woocommerce',
 						'reason' => 'Failed to get the Sift API client.',
@@ -935,9 +1050,9 @@ class Events {
 					$log_title .= sprintf( ', Error %d: %s', $response->apiStatus, $response->apiErrorMessage );
 				}
 
-				wc_get_logger()->log(
-					$log_type,
+				Sift_For_WooCommerce::log(
 					$log_title,
+					$log_type,
 					array(
 						'source'     => 'sift-for-woocommerce',
 						'properties' => $entry['properties'],
@@ -956,7 +1071,7 @@ class Events {
 			// This is only done if the user ID is set.
 			if ( $sift_user_id ) {
 				// Get the decision for the user and apply if needed.
-				self::get_decision( $sift_user_id, $user_id );
+				self::get_decision( $sift_user_id, $sift_user_id );
 			}
 
 			return true;
@@ -969,7 +1084,7 @@ class Events {
 	 *
 	 * @return string The detected IP address of the user.
 	 */
-	private static function get_client_ip() {
+	private static function get_client_ip(): string {
 		$client_ip = false;
 
 		// In order of preference, with the best ones for this purpose first.
@@ -1005,14 +1120,12 @@ class Events {
 	 *
 	 * @return array The user agent, languages accepted, and current store language.
 	 */
-	private static function get_client_browser() {
-		$browser = array(
+	private static function get_client_browser(): array {
+		return array(
 			'$user_agent'       => sanitize_title( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) ),
 			'$accept_language'  => sanitize_key( wp_unslash( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'en-US' ) ), // default to en-US if not set (i.e., a server action)
 			'$content_language' => get_locale(),
 		);
-
-		return $browser;
 	}
 
 	/**
@@ -1023,8 +1136,9 @@ class Events {
 	 * @param string  $context Either `view` or `edit`.
 	 *
 	 * @return array|null
+	 * @throws \Exception If a customer cannot be read/ found and $data is set.
 	 */
-	private static function get_customer_address( int $user_id, string $type = 'billing', string $context = 'view' ) {
+	private static function get_customer_address( int $user_id, string $type = 'billing', string $context = 'view' ): ?array {
 		$customer = new \WC_Customer( $user_id );
 
 		switch ( strtolower( $type ) ) {
@@ -1058,7 +1172,7 @@ class Events {
 	 *
 	 * @return array|null
 	 */
-	private static function get_order_address( string $order_id, string $type = 'billing' ) {
+	private static function get_order_address( string $order_id, string $type = 'billing' ): ?array {
 		$order = wc_get_order( $order_id );
 
 		if ( empty( $order ) ) {
@@ -1067,158 +1181,61 @@ class Events {
 
 		switch ( strtolower( $type ) ) {
 			// WC_Order doesn't have the same `->get_billing` and `->get_shipping()` that the Customer object
-			// has, so we call this way instead.  It also assumes `view` context.
+			// has, so we call this way instead.  It also assumes `view`
 			case 'billing':
-				$address = $order->get_address( 'billing' );
-				break;
+				return array(
+					'$name'      => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+					'$phone'     => $order->get_billing_phone(),
+					'$address_1' => $order->get_billing_address_1(),
+					'$address_2' => $order->get_billing_address_2(),
+					'$city'      => $order->get_billing_city(),
+					'$region'    => $order->get_billing_state(),
+					'$country'   => $order->get_billing_country(),
+					'$zipcode'   => $order->get_billing_postcode(),
+				);
 			case 'shipping':
-				$address = $order->get_address( 'shipping' );
-				break;
+				return array(
+					'$name'      => $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name(),
+					'$phone'     => $order->get_billing_phone(), // Orders don't have shipping phone, use billing phone
+					'$address_1' => $order->get_shipping_address_1(),
+					'$address_2' => $order->get_shipping_address_2(),
+					'$city'      => $order->get_shipping_city(),
+					'$region'    => $order->get_shipping_state(),
+					'$country'   => $order->get_shipping_country(),
+					'$zipcode'   => $order->get_shipping_postcode(),
+				);
 			default:
 				return null;
 		}
-
-		return array(
-			'$name'      => $address['first_name'] . ' ' . $address['last_name'],
-			'$phone'     => $address['phone'],
-			'$address_1' => $address['address_1'],
-			'$address_2' => $address['address_2'],
-			'$city'      => $address['city'],
-			'$region'    => $address['state'],
-			'$country'   => $address['country'],
-			'$zipcode'   => $address['postcode'],
-		);
 	}
 
 	/**
-	 * Get an array of the customer's payment methods.
+	 * Format a user ID for sending to Sift.
 	 *
-	 * Return data should conform to the expected format described here:
-	 * https://developers.sift.com/docs/curl/events-api/complex-field-types/payment-method
+	 * @param integer $user_id The user ID to format.
 	 *
-	 * @param integer $user_id The User / Customer ID.
-	 *
-	 * @return array
-	 */
-	private static function get_customer_payment_methods( int $user_id ) {
-		$payment_methods = array();
-
-		/**
-		 * Allow / disallow customer payment method lookup via looping over all customer orders and extracting the payment method from each order.
-		 *
-		 * If this filter returns false, the sift_for_woocommerce_get_customer_payment_methods filter should be implemented so that some payment methods are returned.
-		 *
-		 * Otherwise, no customer payment methods will be returned.
-		 *
-		 * @param boolean $allow True if this method of payment method lookup should be used, otherwise false.
-		 * @param integer $user_id The User / Customer ID.
-		 *
-		 * @return boolean True if this method of payment method lookup should be used, otherwise false.
-		 */
-		if ( apply_filters( 'sift_for_woocommerce_get_customer_payment_methods_via_order_enumeration', true, $user_id ) ) {
-			$customer_orders = wc_get_orders(
-				array(
-					'limit'    => -1,
-					'customer' => $user_id,
-					'status'   => wc_get_is_paid_statuses(),
-				)
-			);
-
-			$payment_methods = array_map(
-				function ( $order ) {
-					return static::get_order_payment_methods( $order )[0] ?? null;
-				},
-				$customer_orders
-			);
-		}
-
-		/**
-		 * Include a filter here for unexpected payment providers to be able to add their results in as well.
-		 *
-		 * @param array   $payment_methods An array of payment methods.
-		 * @param integer $user_id         The User / Customer ID.
-		 */
-		$payment_methods = apply_filters( 'sift_for_woocommerce_get_customer_payment_methods', $payment_methods, $user_id ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
-
-		$payment_methods = array_reduce(
-			$payment_methods,
-			function ( $payment_methods, $payment_method ) {
-				if ( ! empty( $payment_method ) && ! in_array( $payment_method, $payment_methods, true ) ) {
-					$payment_methods[] = $payment_method;
-				}
-				return $payment_methods;
-			},
-			array()
-		);
-
-		return $payment_methods ?? array();
-	}
-
-	/**
-	 * Get an array of the order's payment methods.
-	 *
-	 * Return data should conform to the expected format described here:
-	 * https://developers.sift.com/docs/curl/events-api/complex-field-types/payment-method
-	 *
-	 * @param \WC_Order $order The Woo Order object.
-	 *
-	 * @return array
-	 */
-	private static function get_order_payment_methods( \WC_Order $order ) {
-		return Sift_For_WooCommerce::get_instance()->get_sift_order_from_wc_order( $order )->get_payment_methods();
-	}
-
-	/**
-	 * Return the amount of transaction "micros"
-	 *
-	 * @link https://developers.sift.com/docs/curl/events-api/reserved-events/transaction in the $amount
-	 *
-	 * @param float $price The price to format.
-	 *
-	 * @return integer
-	 */
-	public static function get_transaction_micros( float $price ) {
-		// Sift expects the amount in micros, so we multiply by 1,000,000, regardless of the currency.
-		return intval( $price * 1000000 );
-	}
-
-	/**
-	 * Log error for unsupported status changes.
-	 *
-	 * @param string $order_id Order ID.
-	 * @param string $from     From status.
-	 * @param string $to       To status.
-	 *
-	 * @return void
-	 */
-	public static function maybe_log_change_order_status( string $order_id, string $from, string $to ) {
-		if ( ! in_array( $to, self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
-			wc_get_logger()->error(
-				sprintf(
-					'Unsupported status change from %s to %s for order %s.',
-					$from,
-					$to,
-					$order_id
-				)
-			);
-		}
-	}
-
-	/**
-	 * Returns the right user ID.
-	 *
-	 * @param integer $user_id Original user ID.
-	 *
-	 * @return string Returns an empty string if the user ID is 0
+	 * @return string The formatted user ID.
 	 */
 	private static function format_user_id( int $user_id ): string {
-		if ( 0 === $user_id ) {
-			// Returns empty string if the user is unknown
-			// see https://developers.sift.com/tutorials/anonymous-users
+		// If user ID is 0 (for guests or not set), return empty string.
+		if ( empty( $user_id ) || 0 === $user_id ) {
 			return '';
 		}
 
+		// Convert to string and return.
 		return (string) $user_id;
+	}
+
+	/**
+	 * Convert a currency amount to micros (1/1,000,000 of the base unit).
+	 * This format is required by Sift's API for all currency values.
+	 *
+	 * @param float $amount The amount to convert to micros.
+	 *
+	 * @return integer The amount in micros (multiplied by 1,000,000).
+	 */
+	public static function get_transaction_micros( float $amount ): int {
+		return (int) ( $amount * 1000000 );
 	}
 
 	/**
@@ -1228,13 +1245,13 @@ class Events {
 	 *
 	 * @link https://developers.sift.com/docs/curl/events-api/complex-field-types/item
 	 *
-	 * @return string
+	 * @return string The formatted product category, or Uncategorized if no category is found.
 	 */
 	private static function get_product_category( WC_Product $product ): string {
 
 		$category_ids = wc_get_product_cat_ids( $product->get_id() );
 		if ( empty( $category_ids ) ) {
-			return '';
+			return 'Uncategorized';
 		}
 
 		$taxonomy  = 'product_cat'; // Taxonomy for product category
@@ -1256,5 +1273,46 @@ class Events {
 		}
 		// Output the formatted product categories with their ancestors
 		return implode( ', ', $output );
+	}
+
+	/**
+	 * Get the customer payment methods in the format that Sift expects.
+	 *
+	 * @param integer $user_id The User ID.
+	 *
+	 * @return array An array of payment methods in Sift format.
+	 */
+	private static function get_customer_payment_methods( int $user_id ): array {
+		// If WC Payment Methods is not available, return empty array
+		if ( ! function_exists( 'wc_get_customer_saved_methods_list' ) ) {
+			return array();
+		}
+
+		$payment_methods = array();
+		$saved_methods   = wc_get_customer_saved_methods_list( $user_id );
+
+		if ( ! empty( $saved_methods['payment'] ) ) {
+			foreach ( $saved_methods['payment'] as $method ) {
+				$payment_method = array(
+					'$payment_type'    => '$credit_card',
+					'$payment_gateway' => $method['method']['gateway'] ?? '',
+					'$card_bin'        => substr( $method['method']['last4'] ?? '', 0, 6 ),
+					'$card_last4'      => $method['method']['last4'] ?? '',
+				);
+
+				// Add expiration date if available
+				if ( ! empty( $method['expires'] ) ) {
+					$expiry_parts = explode( '/', $method['expires'] );
+					if ( count( $expiry_parts ) === 2 ) {
+						$payment_method['$card_expiry_month'] = $expiry_parts[0];
+						$payment_method['$card_expiry_year']  = $expiry_parts[1];
+					}
+				}
+
+				$payment_methods[] = $payment_method;
+			}
+		}
+
+		return $payment_methods;
 	}
 }
