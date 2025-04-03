@@ -983,7 +983,7 @@ class Events {
 			'event'      => $event,
 			'properties' => array_filter(
 				$properties,
-				function ($value) {
+				function ( $value ) {
 					return null !== $value && '' !== $value;
 				}
 			),
@@ -1132,11 +1132,11 @@ class Events {
 	 * Get the address details in the format that Sift expects.
 	 *
 	 * @param integer $user_id The User / Customer ID.
-	 * @param string $type Either `billing` or `shipping`.
-	 * @param string $context Either `view` or `edit`.
+	 * @param string  $type    Either `billing` or `shipping`.
+	 * @param string  $context Either `view` or `edit`.
 	 *
 	 * @return array|null
-	 * @throws \Exception
+	 * @throws \Exception If a customer cannot be read/ found and $data is set.
 	 */
 	private static function get_customer_address( int $user_id, string $type = 'billing', string $context = 'view' ): ?array {
 		$customer = new \WC_Customer( $user_id );
