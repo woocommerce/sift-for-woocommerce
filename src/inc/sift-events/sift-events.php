@@ -41,7 +41,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function init_hooks() {
+	public static function init_hooks(): void {
 		add_action( 'wp_logout', array( static::class, 'logout' ), 100 );
 		add_action( 'wp_login', array( static::class, 'login_success' ), 100, 2 );
 		add_action( 'wp_login_failed', array( static::class, 'login_failure' ), 100, 2 );
@@ -85,7 +85,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function logout( string $user_id ) {
+	public static function logout( string $user_id ): void {
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$logout ) ) {
 			return;
 		}
@@ -151,7 +151,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function login_success( string $username, object $user ) {
+	public static function login_success( string $username, object $user ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$login ) ) {
 			return;
@@ -193,7 +193,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function login_failure( string $username, \WP_Error $error ) {
+	public static function login_failure( string $username, \WP_Error $error ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$login ) ) {
 			return;
@@ -253,7 +253,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function create_account( string $user_id ) {
+	public static function create_account( string $user_id ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_account ) ) {
 			return;
@@ -303,7 +303,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function update_account( string $user_id, ?\WP_User $old_user_data = null, ?array $new_user_data = null ) {
+	public static function update_account( string $user_id, ?\WP_User $old_user_data = null, ?array $new_user_data = null ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$update_account ) ) {
 			return;
@@ -357,7 +357,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function update_password( string $new_password, string $user_id ) {
+	public static function update_password( string $new_password, string $user_id ): void {
 
 		// We are immediately setting this to null, so that it is not inadvertently shared or disclosed.
 		$new_password = null;
@@ -399,7 +399,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function link_session_to_user( string $session_id, string $user_id ) {
+	public static function link_session_to_user( string $session_id, string $user_id ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$link_session_to_user ) ) {
 			return;
@@ -431,7 +431,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function add_to_cart( string $cart_item_key ) {
+	public static function add_to_cart( string $cart_item_key ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$add_item_to_cart ) ) {
 			return;
@@ -491,7 +491,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function remove_item_from_cart( string $cart_item_key, \WC_Cart $cart ) {
+	public static function remove_item_from_cart( string $cart_item_key, \WC_Cart $cart ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$remove_item_from_cart ) ) {
 			return;
@@ -539,7 +539,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function create_order( string $order_id, \WC_Order $order ) {
+	public static function create_order( string $order_id, \WC_Order $order ): void {
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_order ) ) {
 			return;
 		}
@@ -562,7 +562,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function update_or_create_order( string $order_id, \WC_Order $order, bool $create_order = false ) {
+	public static function update_or_create_order( string $order_id, \WC_Order $order, bool $create_order = false ): void {
 		// Add debug logging to see the status
 		Sift_For_WooCommerce::log(
 			sprintf( 'Order status check - Status: %s, Create Order: %s', $order->get_status(), $create_order ? 'true' : 'false' ),
@@ -609,7 +609,7 @@ class Events {
 			'$order_id'           => $order_id,
 			'$user_email'         => $order->get_billing_email(),
 			'$verification_phone_number'
-				=> '+' === substr( $order->get_billing_phone(), 0, 1 ) ? preg_replace( '/[^0-9\+]/', '', $order->get_billing_phone() ) : null,
+				=> str_starts_with( $order->get_billing_phone(), '+' ) ? preg_replace( '/[^0-9+]/', '', $order->get_billing_phone() ) : null,
 			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ),
 			'$payment_methods'    => $sift_order->get_payment_methods(),
 			'$currency_code'      => $order->get_currency(),
@@ -704,11 +704,11 @@ class Events {
 	 *
 	 * @return boolean True if the order is free.
 	 */
-	public static function is_free_order( \WC_Order $order ) {
+	public static function is_free_order( \WC_Order $order ): bool {
 		$total = $order->get_total();
 
 		// If the total is 0 or 0.00, it's a free order.
-		return 0 === $total || '0.00' === $total;
+		return 0.0 === $total;
 	}
 
 	/**
@@ -722,7 +722,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function transaction( \WC_Order $order, string $status, string $transaction_type ) {
+	public static function transaction( \WC_Order $order, string $status, string $transaction_type ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$transaction ) ) {
 			return;
@@ -761,7 +761,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function change_order_status( string $order_id, \WC_Order $order, array $status_transition ) {
+	public static function change_order_status( string $order_id, \WC_Order $order, array $status_transition ): void {
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$order_status ) ) {
 			return;
 		}
@@ -853,7 +853,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function chargeback( string $order_id, \WC_Order $order, string $chargeback_reason ) {
+	public static function chargeback( string $order_id, \WC_Order $order, string $chargeback_reason ): void {
 
 		if ( ! Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$chargeback ) ) {
 			return;
@@ -887,7 +887,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function maybe_log_change_order_status( string $order_id, string $old_status, string $new_status ) {
+	public static function maybe_log_change_order_status( string $order_id, string $old_status, string $new_status ): void {
 		// Check if this is a supported status change that would be caught by our other hook.
 		if ( in_array( $new_status, self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
 			// This status change will be handled by the dedicated hook, so we can skip.
@@ -958,7 +958,7 @@ class Events {
 	 *
 	 * @return string|null The decision ID or null if no decision ID was provided.
 	 */
-	public static function apply_decision( string $decision_id, string $user_id ) {
+	public static function apply_decision( string $decision_id, string $user_id ): ?string {
 		\apply_filters( 'sift_decision_received', null, $decision_id, $user_id );
 		return $decision_id;
 	}
@@ -971,7 +971,7 @@ class Events {
 	 *
 	 * @return void
 	 */
-	public static function add( string $event, array $properties ) {
+	public static function add( string $event, array $properties ): void {
 		// Give a chance for the platform to modify the data (and add potentially new custom data)
 		$properties = apply_filters( 'sift_for_woocommerce_pre_send_event_properties', $properties, $event );
 
@@ -979,17 +979,14 @@ class Events {
 			return;
 		}
 
-		array_push(
-			self::$to_send,
-			array(
-				'event'      => $event,
-				'properties' => array_filter(
-					$properties,
-					function ( $value ) {
-						return null !== $value && '' !== $value;
-					}
-				),
-			)
+		self::$to_send[] = array(
+			'event'      => $event,
+			'properties' => array_filter(
+				$properties,
+				function ($value) {
+					return null !== $value && '' !== $value;
+				}
+			),
 		);
 	}
 
@@ -998,7 +995,7 @@ class Events {
 	 *
 	 * @return integer
 	 */
-	private static function count() {
+	private static function count(): int {
 		return count( self::$to_send );
 	}
 
@@ -1007,7 +1004,7 @@ class Events {
 	 *
 	 * @return boolean
 	 */
-	public static function send() {
+	public static function send(): bool {
 		if ( self::count() > 0 ) {
 			// Log all events that are about to be sent
 			if ( function_exists( 'wc_get_logger' ) ) {
@@ -1025,7 +1022,7 @@ class Events {
 				);
 			}
 
-			$client = \Sift_For_WooCommerce\Sift_For_WooCommerce::get_api_client();
+			$client = Sift_For_WooCommerce::get_api_client();
 			if ( empty( $client ) ) {
 				Sift_For_WooCommerce::log(
 					'Failed to send events to Sift',
@@ -1087,7 +1084,7 @@ class Events {
 	 *
 	 * @return string The detected IP address of the user.
 	 */
-	private static function get_client_ip() {
+	private static function get_client_ip(): string {
 		$client_ip = false;
 
 		// In order of preference, with the best ones for this purpose first.
@@ -1123,26 +1120,25 @@ class Events {
 	 *
 	 * @return array The user agent, languages accepted, and current store language.
 	 */
-	private static function get_client_browser() {
-		$browser = array(
+	private static function get_client_browser(): array {
+		return array(
 			'$user_agent'       => sanitize_title( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) ),
 			'$accept_language'  => sanitize_key( wp_unslash( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'en-US' ) ), // default to en-US if not set (i.e., a server action)
 			'$content_language' => get_locale(),
 		);
-
-		return $browser;
 	}
 
 	/**
 	 * Get the address details in the format that Sift expects.
 	 *
 	 * @param integer $user_id The User / Customer ID.
-	 * @param string  $type    Either `billing` or `shipping`.
-	 * @param string  $context Either `view` or `edit`.
+	 * @param string $type Either `billing` or `shipping`.
+	 * @param string $context Either `view` or `edit`.
 	 *
 	 * @return array|null
+	 * @throws \Exception
 	 */
-	private static function get_customer_address( int $user_id, string $type = 'billing', string $context = 'view' ) {
+	private static function get_customer_address( int $user_id, string $type = 'billing', string $context = 'view' ): ?array {
 		$customer = new \WC_Customer( $user_id );
 
 		switch ( strtolower( $type ) ) {
@@ -1176,7 +1172,7 @@ class Events {
 	 *
 	 * @return array|null
 	 */
-	private static function get_order_address( string $order_id, string $type = 'billing' ) {
+	private static function get_order_address( string $order_id, string $type = 'billing' ): ?array {
 		$order = wc_get_order( $order_id );
 
 		if ( empty( $order ) ) {
