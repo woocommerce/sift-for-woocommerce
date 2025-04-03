@@ -1071,7 +1071,7 @@ class Events {
 			// This is only done if the user ID is set.
 			if ( $sift_user_id ) {
 				// Get the decision for the user and apply if needed.
-				self::get_decision( $sift_user_id, $user_id );
+				self::get_decision( $sift_user_id, $sift_user_id );
 			}
 
 			return true;
