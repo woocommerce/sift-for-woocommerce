@@ -622,19 +622,28 @@ class Events {
 			'$time'               => intval( 1000 * microtime( true ) ),
 		);
 
-		// Add the meta data.
+		/**
+		* Add the meta data.
+		*
+		* @var WC_Order_Item_Product $item
+		*/
 		foreach ( $order->get_items() as $item ) {
 			$product = $item->get_product();
 
+			if ( ! ( $product instanceof WC_Product ) ) {
+				Sift_For_WooCommerce::log(
+					sprintf( 'Product cannot be found for WC_Order_Item_Product: %s', $item->get_id() ),
+					'debug',
+					array( 'source' => 'sift-order-product' )
+				);
+				continue;
+			}
+
 			Sift_For_WooCommerce::log(
-				sprintf( 'Product: %s', $product ),
+				sprintf( 'Product: %s', $product->get_slug() ),
 				'debug',
 				array( 'source' => 'sift-order-product' )
 			);
-
-			if ( ! ( $product instanceof WC_Product ) ) {
-				continue;
-			}
 
 			$sku = empty( $product->get_sku() ) ? $product->get_id() : $product->get_sku();
 
