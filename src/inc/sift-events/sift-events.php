@@ -576,12 +576,6 @@ class Events {
 		$event = $create_order ? Sift_Event_Types::$create_order : Sift_Event_Types::$update_order;
 
 		if ( ! Sift_Event_Types::can_event_be_sent( $event ) ) {
-			// Log when event can't be sent due to settings.
-			Sift_For_WooCommerce::log(
-				sprintf( 'Event %s disabled for order %s', $event, $order_id ),
-				'error',
-				array( 'source' => 'sift-order-events' )
-			);
 			return;
 		}
 
