@@ -130,6 +130,8 @@ class DisabledEventTest extends EventTest {
 		);
 	}
 
+	
+
 	/**
 	 * Test that the $or event is triggered.
 	 *
