@@ -563,12 +563,6 @@ class Events {
 	 * @return void
 	 */
 	public static function update_or_create_order( string $order_id, \WC_Order $order, bool $create_order = false ): void {
-		// Add debug logging to see the status
-		Sift_For_WooCommerce::log(
-			sprintf( 'Order status check - Status: %s, Create Order: %s', $order->get_status(), $create_order ? 'true' : 'false' ),
-			'debug',
-			array( 'source' => 'sift-order-events' )
-		);
 		// Check for unsupported statuses and log error
 		if ( ! in_array( $order->get_status(), self::SUPPORTED_WOO_ORDER_STATUS_CHANGES, true ) ) {
 			Sift_For_WooCommerce::log(
@@ -581,20 +575,7 @@ class Events {
 
 		$event = $create_order ? Sift_Event_Types::$create_order : Sift_Event_Types::$update_order;
 
-		// Log the event type we're trying to send for debugging.
-		Sift_For_WooCommerce::log(
-			sprintf( 'Preparing to send %s event for order %s', $event, $order_id ),
-			'debug',
-			array( 'source' => 'sift-order-events' )
-		);
-
 		if ( ! Sift_Event_Types::can_event_be_sent( $event ) ) {
-			// Log when event can't be sent due to settings.
-			Sift_For_WooCommerce::log(
-				sprintf( 'Event %s disabled for order %s', $event, $order_id ),
-				'debug',
-				array( 'source' => 'sift-order-events' )
-			);
 			return;
 		}
 
@@ -639,12 +620,6 @@ class Events {
 				continue;
 			}
 
-			Sift_For_WooCommerce::log(
-				sprintf( 'Product: %s', $product->get_slug() ),
-				'debug',
-				array( 'source' => 'sift-order-product' )
-			);
-
 			$sku = empty( $product->get_sku() ) ? $product->get_id() : $product->get_sku();
 
 			// Construct item with ONLY fields specified in Sift API documentation.
@@ -674,13 +649,6 @@ class Events {
 
 		try {
 			SiftEventsValidator::validate_create_or_update_order( $properties );
-
-			// Log successful validation.
-			Sift_For_WooCommerce::log(
-				sprintf( 'Successfully validated %s event for order %s, adding to queue', $event, $order_id ),
-				'debug',
-				array( 'source' => 'sift-order-events' )
-			);
 		} catch ( \Exception $e ) {
 			// Log validation error in detail.
 			Sift_For_WooCommerce::log(
@@ -697,13 +665,6 @@ class Events {
 
 		// Add event to queue.
 		self::add( $event, $properties );
-
-		// Log successful queue addition.
-		Sift_For_WooCommerce::log(
-			sprintf( 'Successfully added %s event for order %s to queue', $event, $order_id ),
-			'debug',
-			array( 'source' => 'sift-order-events' )
-		);
 	}
 
 	/**
@@ -782,11 +743,6 @@ class Events {
 		if ( $is_free_order &&
 			in_array( $status_transition['to'], array( 'pending', 'processing' ), true ) &&
 			Sift_Event_Types::can_event_be_sent( Sift_Event_Types::$create_order ) ) {
-			Sift_For_WooCommerce::log(
-				sprintf( 'Free order detected at status change - triggering create_order event for order %s', $order_id ),
-				'debug',
-				array( 'source' => 'sift-free-orders' )
-			);
 
 			// This will trigger the create_order event for this free order.
 			self::create_order( $order_id, $order );
@@ -1023,12 +979,6 @@ class Events {
 					},
 					self::$to_send
 				);
-
-				Sift_For_WooCommerce::log(
-					sprintf( 'Sending %d events to Sift: %s', self::count(), implode( ', ', $event_types ) ),
-					'debug',
-					array( 'source' => 'sift-events-send' )
-				);
 			}
 
 			$client = Sift_For_WooCommerce::get_api_client();
@@ -1051,23 +1001,17 @@ class Events {
 
 				$response = $client->track( $entry['event'], $entry['properties'] );
 
-				$log_type  = 'debug';
-				$log_title = sprintf( 'Sent `%s`', $entry['event'] );
-
 				if ( 200 !== $response->httpStatusCode ) {
-					$log_type   = 'error';
-					$log_title .= sprintf( ', Error %d: %s', $response->apiStatus, $response->apiErrorMessage );
+					Sift_For_WooCommerce::log(
+						sprintf( 'Sent `%s`, Error %d: %s', $entry['event'], $response->apiStatus, $response->apiErrorMessage ),
+						'error',
+						array(
+							'source'     => 'sift-for-woocommerce',
+							'properties' => $entry['properties'],
+							'response'   => $response,
+						)
+					);
 				}
-
-				Sift_For_WooCommerce::log(
-					$log_title,
-					$log_type,
-					array(
-						'source'     => 'sift-for-woocommerce',
-						'properties' => $entry['properties'],
-						'response'   => $response,
-					)
-				);
 			}
 
 			// Now that it's sent, clear the $to_send static in case it was run manually.
