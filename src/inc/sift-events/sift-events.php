@@ -935,16 +935,27 @@ class Events {
 	 * @return void
 	 */
 	public static function queue_sending_event( string $event, array $properties ): void {
-		as_enqueue_async_action( 'async_sift_for_woocommerce_send_event', [ $event, $properties ] );
-	}
 
-	public static function send_event( string $event, array $properties ): bool {
 		// Give a chance for the platform to modify the data (and add potentially new custom data)
 		$properties = apply_filters( 'sift_for_woocommerce_pre_send_event_properties', $properties, $event );
 
 		if ( empty( $properties ) ) {
-			return false;
+			return;
 		}
+
+		as_enqueue_async_action( 'async_sift_for_woocommerce_send_event', array( $event, $properties ) );
+	}
+
+	/**
+	 * Send off events to Sift. This is run async thanks to Action Scheduler.
+	 *
+	 * @param string $event      Event type to send
+	 * @param array  $properties Properties of the Sift event
+	 *
+	 * @return bool
+	 */
+
+	public static function send_event( string $event, array $properties ): bool {
 
 		$entry = array(
 			'event'      => $event,
