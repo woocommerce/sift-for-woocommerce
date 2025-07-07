@@ -23,7 +23,7 @@ class GenericEventTest extends \EventTest {
 			return $properties;
 		}, 10, 2 );
 
-		Events::add( 'test_event_name', array( '$user_id' => '12345' ) );
+		Events::queue_sending_event( 'test_event_name', array( '$user_id' => '12345' ) );
 		static::fail_on_error_logged();
 
 		// We see if the event in the stack was modified
@@ -37,7 +37,7 @@ class GenericEventTest extends \EventTest {
 		// We check when removing the filter
 		remove_all_filters( 'sift_for_woocommerce_pre_send_event_properties' );
 
-		Events::add( 'test_event_name', array( '$user_id' => '12345' ) );
+		Events::queue_sending_event( 'test_event_name', array( '$user_id' => '12345' ) );
 		static::fail_on_error_logged();
 
 		// We see if the event in the stack was modified
