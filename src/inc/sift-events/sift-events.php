@@ -949,12 +949,11 @@ class Events {
 	/**
 	 * Send off events to Sift. This is run async thanks to Action Scheduler.
 	 *
-	 * @param string $event      Event type to send
-	 * @param array  $properties Properties of the Sift event
+	 * @param string $event      Event type to send.
+	 * @param array  $properties Properties of the Sift event.
 	 *
-	 * @return bool
+	 * @return boolean
 	 */
-
 	public static function send_event( string $event, array $properties ): bool {
 
 		$entry = array(
