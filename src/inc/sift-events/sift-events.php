@@ -24,8 +24,6 @@ use WC_Product;
  * Class Events
  */
 class Events {
-	public static $to_send = array();
-
 	const SUPPORTED_WOO_ORDER_STATUS_CHANGES = array(
 		'pending',
 		'processing',
@@ -939,6 +937,14 @@ class Events {
 		// Give a chance for the platform to modify the data (and add potentially new custom data)
 		$properties = apply_filters( 'sift_for_woocommerce_pre_send_event_properties', $properties, $event );
 
+		// Removed unused properties before queueing and storing the event
+		$properties = array_filter(
+			$properties,
+			function ( $value ) {
+				return null !== $value && '' !== $value;
+			}
+		);
+
 		if ( empty( $properties ) ) {
 			return;
 		}
@@ -966,25 +972,15 @@ class Events {
 			),
 		);
 
-		// Log all events that are about to be sent
-		if ( function_exists( 'wc_get_logger' ) ) {
-			$event_types = array_map(
-				function ( $entry ) {
-					return $entry['event'];
-				},
-				self::$to_send
-			);
-		}
-
 		$client = Sift_For_WooCommerce::get_api_client();
 		if ( empty( $client ) ) {
 			Sift_For_WooCommerce::log(
-				'Failed to send events to Sift',
+				'Failed to send event to Sift',
 				'error',
 				array(
 					'source' => 'sift-for-woocommerce',
 					'reason' => 'Failed to get the Sift API client.',
-					'events' => self::$to_send,
+					'event' => $entry,
 				)
 			);
 			return false;
