@@ -153,7 +153,12 @@ abstract class EventTest extends WP_UnitTestCase {
 	 */
 	public static function filter_events_gen( $filters = [] ) {
 		// Get the last 25 events queued in actionscheduler
-		$actions = as_get_scheduled_actions( [ 'hook' => 'async_sift_for_woocommerce_send_event', 'per_page' => 25 ] );
+		$actions = as_get_scheduled_actions(
+			[
+				'hook'     => 'async_sift_for_woocommerce_send_event',
+				'per_page' => 25,
+			]
+		);
 
 		if ( empty( $filters['event'] ?? null ) ) {
 			return null;
@@ -166,7 +171,10 @@ abstract class EventTest extends WP_UnitTestCase {
 			}
 
 			$action_args = $action->get_args();
-			$event = [ 'event' => $action_args[0], 'properties' => $action_args[1] ];
+			$event       = [
+				'event'      => $action_args[0],
+				'properties' => $action_args[1],
+			];
 
 			if ( $event['event'] === $filters['event'] ) {
 				$match = true;

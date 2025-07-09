@@ -980,7 +980,7 @@ class Events {
 				array(
 					'source' => 'sift-for-woocommerce',
 					'reason' => 'Failed to get the Sift API client.',
-					'event' => $entry,
+					'event'  => $entry,
 				)
 			);
 			return false;
