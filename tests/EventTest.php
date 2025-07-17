@@ -160,7 +160,7 @@ abstract class EventTest extends WP_UnitTestCase {
 			]
 		);
 
-		if ( empty( $filters['event'] ?? null ) ) {
+		if ( empty( $filters['event'] ) ) {
 			return null;
 		}
 
