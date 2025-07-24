@@ -20,6 +20,7 @@ class UpdateOrderEventTest extends EventTest {
 	 * @return void
 	 */
 	public function test_create_order() {
+		self::reset_events();
 		// Arrange
 		// - create a user and log them in
 		$user_id = $this->factory()->user->create();
@@ -60,6 +61,7 @@ class UpdateOrderEventTest extends EventTest {
 	 * @return void
 	 */
 	public function test_create_order_with_invalid_phone_omits_phone() {
+		self::reset_events();
 		// Arrange
 		// - create a user and log them in
 		$user_id = $this->factory()->user->create();

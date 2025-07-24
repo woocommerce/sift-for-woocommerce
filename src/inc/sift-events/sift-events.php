@@ -24,8 +24,6 @@ use WC_Product;
  * Class Events
  */
 class Events {
-	public static $to_send = array();
-
 	const SUPPORTED_WOO_ORDER_STATUS_CHANGES = array(
 		'pending',
 		'processing',
@@ -53,6 +51,7 @@ class Events {
 		add_action( 'woocommerce_new_order', array( static::class, 'create_order' ), 100, 2 );
 		add_action( 'woocommerce_update_order', array( static::class, 'update_or_create_order' ), 100, 2 );
 		add_action( 'woocommerce_applied_coupon', array( static::class, 'add_promotion' ), 100, 2 );
+		add_action( 'async_sift_for_woocommerce_send_event', array( static::class, 'send_event' ), 10, 2 );
 
 		/**
 		 * We need to break this out into separate actions so we have the $status_transition available.
@@ -71,9 +70,6 @@ class Events {
 		 * https://github.com/woocommerce/woocommerce/pull/45146
 		 */
 		add_action( 'woocommerce_guest_session_to_user_id', array( static::class, 'link_session_to_user' ), 10, 2 );
-
-		// On shutdown, send any queued events.
-		add_action( 'shutdown', array( static::class, 'send' ) );
 	}
 
 	/**
@@ -90,7 +86,7 @@ class Events {
 			return;
 		}
 
-		self::add(
+		self::queue_sending_event(
 			'$logout',
 			array(
 				'$user_id' => self::format_user_id( intval( $user_id ) ),
@@ -138,7 +134,7 @@ class Events {
 			return;
 		}
 
-		self::add( Sift_Event_Types::$add_promotion, $properties );
+		self::queue_sending_event( Sift_Event_Types::$add_promotion, $properties );
 	}
 
 	/**
@@ -180,7 +176,7 @@ class Events {
 			return;
 		}
 
-		self::add( Sift_Event_Types::$login, $properties );
+		self::queue_sending_event( Sift_Event_Types::$login, $properties );
 	}
 
 	/**
@@ -241,7 +237,7 @@ class Events {
 			$properties['$failure_reason'] = $failure_reason;
 		}
 
-		self::add( Sift_Event_Types::$login, $properties );
+		self::queue_sending_event( Sift_Event_Types::$login, $properties );
 	}
 
 	/**
@@ -286,7 +282,7 @@ class Events {
 			return;
 		}
 
-		self::add(
+		self::queue_sending_event(
 			Sift_Event_Types::$create_account,
 			$properties
 		);
@@ -344,7 +340,7 @@ class Events {
 			return;
 		}
 
-		self::add( Sift_Event_Types::$update_account, $properties );
+		self::queue_sending_event( Sift_Event_Types::$update_account, $properties );
 	}
 
 	/**
@@ -386,7 +382,7 @@ class Events {
 			return;
 		}
 
-		self::add( Sift_Event_Types::$update_password, $properties );
+		self::queue_sending_event( Sift_Event_Types::$update_password, $properties );
 	}
 
 	/**
@@ -419,7 +415,7 @@ class Events {
 			return;
 		}
 
-		self::add( Sift_Event_Types::$link_session_to_user, $properties );
+		self::queue_sending_event( Sift_Event_Types::$link_session_to_user, $properties );
 	}
 
 	/**
@@ -475,7 +471,7 @@ class Events {
 			return;
 		}
 
-		self::add(
+		self::queue_sending_event(
 			Sift_Event_Types::$add_item_to_cart,
 			$properties
 		);
@@ -526,7 +522,7 @@ class Events {
 			'$time'         => intval( 1000 * microtime( true ) ),
 		);
 
-		self::add( Sift_Event_Types::$remove_item_from_cart, $properties );
+		self::queue_sending_event( Sift_Event_Types::$remove_item_from_cart, $properties );
 	}
 
 	/**
@@ -664,7 +660,7 @@ class Events {
 		}
 
 		// Add event to queue.
-		self::add( $event, $properties );
+		self::queue_sending_event( $event, $properties );
 	}
 
 	/**
@@ -716,7 +712,7 @@ class Events {
 			return;
 		}
 
-		self::add( Sift_Event_Types::$transaction, $properties );
+		self::queue_sending_event( Sift_Event_Types::$transaction, $properties );
 	}
 
 	/**
@@ -804,7 +800,7 @@ class Events {
 			return;
 		}
 
-		self::add( Sift_Event_Types::$order_status, $properties );
+		self::queue_sending_event( Sift_Event_Types::$order_status, $properties );
 	}
 
 	/**
@@ -839,7 +835,7 @@ class Events {
 			return;
 		}
 
-		self::add( Sift_Event_Types::$chargeback, $properties );
+		self::queue_sending_event( Sift_Event_Types::$chargeback, $properties );
 	}
 
 	/**
@@ -929,22 +925,44 @@ class Events {
 	}
 
 	/**
-	 * Add a Sift Event to the queue.
+	 * Add a Sift Event to the async queue.
 	 *
 	 * @param string $event      The event to enqueue.
 	 * @param array  $properties The properties to send with the event.
 	 *
 	 * @return void
 	 */
-	public static function add( string $event, array $properties ): void {
+	public static function queue_sending_event( string $event, array $properties ): void {
+
 		// Give a chance for the platform to modify the data (and add potentially new custom data)
 		$properties = apply_filters( 'sift_for_woocommerce_pre_send_event_properties', $properties, $event );
+
+		// Removed unused properties before queueing and storing the event
+		$properties = array_filter(
+			$properties,
+			function ( $value ) {
+				return null !== $value && '' !== $value;
+			}
+		);
 
 		if ( empty( $properties ) ) {
 			return;
 		}
 
-		self::$to_send[] = array(
+		as_enqueue_async_action( 'async_sift_for_woocommerce_send_event', array( $event, $properties ) );
+	}
+
+	/**
+	 * Send off events to Sift. This is run async thanks to Action Scheduler.
+	 *
+	 * @param string $event      Event type to send.
+	 * @param array  $properties Properties of the Sift event.
+	 *
+	 * @return boolean
+	 */
+	public static function send_event( string $event, array $properties ): bool {
+
+		$entry = array(
 			'event'      => $event,
 			'properties' => array_filter(
 				$properties,
@@ -953,83 +971,49 @@ class Events {
 				}
 			),
 		);
-	}
 
-	/**
-	 * Return how many events have been registered thus far and are queued up to send.
-	 *
-	 * @return integer
-	 */
-	private static function count(): int {
-		return count( self::$to_send );
-	}
-
-	/**
-	 * Send off the events, if any.
-	 *
-	 * @return boolean
-	 */
-	public static function send(): bool {
-		if ( self::count() > 0 ) {
-			// Log all events that are about to be sent
-			if ( function_exists( 'wc_get_logger' ) ) {
-				$event_types = array_map(
-					function ( $entry ) {
-						return $entry['event'];
-					},
-					self::$to_send
-				);
-			}
-
-			$client = Sift_For_WooCommerce::get_api_client();
-			if ( empty( $client ) ) {
-				Sift_For_WooCommerce::log(
-					'Failed to send events to Sift',
-					'error',
-					array(
-						'source' => 'sift-for-woocommerce',
-						'reason' => 'Failed to get the Sift API client.',
-						'events' => self::$to_send,
-					)
-				);
-				return false;
-			}
-
-			foreach ( self::$to_send as $entry ) {
-				// We need the original user ID to handle the decision locally after events are sent.
-				$user_id = $entry['properties']['$user_id'] ?? null;
-
-				$response = $client->track( $entry['event'], $entry['properties'] );
-
-				if ( 200 !== $response->httpStatusCode ) {
-					Sift_For_WooCommerce::log(
-						sprintf( 'Sent `%s`, Error %d: %s', $entry['event'], $response->apiStatus, $response->apiErrorMessage ),
-						'error',
-						array(
-							'source'     => 'sift-for-woocommerce',
-							'properties' => $entry['properties'],
-							'response'   => $response,
-						)
-					);
-				}
-			}
-
-			// Now that it's sent, clear the $to_send static in case it was run manually.
-			self::$to_send = array();
-
-			// Get the user ID we sent to Sift from the properties.
-			$sift_user_id = $entry['properties']['$user_id'] ?? null;
-
-			// Get the current decision since events have been sent and could have changed the decision.
-			// This is only done if the user ID is set.
-			if ( $sift_user_id ) {
-				// Get the decision for the user and apply if needed.
-				self::get_decision( $sift_user_id, $sift_user_id );
-			}
-
-			return true;
+		$client = Sift_For_WooCommerce::get_api_client();
+		if ( empty( $client ) ) {
+			Sift_For_WooCommerce::log(
+				'Failed to send event to Sift',
+				'error',
+				array(
+					'source' => 'sift-for-woocommerce',
+					'reason' => 'Failed to get the Sift API client.',
+					'event'  => $entry,
+				)
+			);
+			return false;
 		}
-		return false;
+
+		// We need the original user ID to handle the decision locally after events are sent.
+		$user_id = $entry['properties']['$user_id'] ?? null;
+
+		$response = $client->track( $entry['event'], $entry['properties'] );
+
+		if ( 200 !== $response->httpStatusCode ) {
+			Sift_For_WooCommerce::log(
+				sprintf( 'Sent `%s`, Error %d: %s', $entry['event'], $response->apiStatus, $response->apiErrorMessage ),
+				'error',
+				array(
+					'source'     => 'sift-for-woocommerce',
+					'properties' => $entry['properties'],
+					'response'   => $response,
+				)
+			);
+		}
+
+		// Get the user ID we sent to Sift from the properties.
+		$sift_user_id = $entry['properties']['$user_id'] ?? null;
+
+		// Get the current decision since events have been sent and could have changed the decision.
+		// This is only done if the user ID is set.
+		if ( $sift_user_id ) {
+			// Get the decision for the user and apply if needed.
+			self::get_decision( $sift_user_id, $sift_user_id );
+		}
+
+		return true;
 	}
 
 	/**

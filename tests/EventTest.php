@@ -152,18 +152,44 @@ abstract class EventTest extends WP_UnitTestCase {
 	 * @return generator
 	 */
 	public static function filter_events_gen( $filters = [] ) {
-		foreach ( Events::$to_send as $event ) {
-			$match = true;
-			// flatten the keys to dot notation (e.g. 'key.subkey.subsubkey' => 'value')
-			$event = self::array_dot( $event );
-			foreach ( $filters as $key => $value ) {
-				if ( ! isset( $event[ $key ] ) || $event[ $key ] !== $value ) {
-					$match = false;
-					break;
-				}
+		// Get the last 25 events queued in actionscheduler
+		$actions = as_get_scheduled_actions(
+			[
+				'hook'     => 'async_sift_for_woocommerce_send_event',
+				'per_page' => 25,
+			]
+		);
+
+		if ( empty( $filters['event'] ) ) {
+			return null;
+		}
+
+		foreach ( $actions as $action ) {
+			// Skip cancelled jobs
+			if ( $action instanceof ActionScheduler_CanceledAction ) {
+				continue;
 			}
-			if ( $match ) {
-				yield $event;
+
+			$action_args = $action->get_args();
+			$event       = [
+				'event'      => $action_args[0],
+				'properties' => $action_args[1],
+			];
+
+			if ( $event['event'] === $filters['event'] ) {
+				$match = true;
+				$event = self::array_dot( $event );
+
+				foreach ( $filters as $key => $value ) {
+					if ( ! isset( $event[ $key ] ) || $event[ $key ] !== $value ) {
+						$match = false;
+						break;
+					}
+				}
+
+				if ( $match ) {
+					yield $event;
+				}
 			}
 		}
 	}
@@ -185,7 +211,7 @@ abstract class EventTest extends WP_UnitTestCase {
 	 * @return void
 	 */
 	public static function reset_events() {
-		Sift_For_WooCommerce\Sift_Events\Events::$to_send = [];
+		as_unschedule_all_actions( 'async_sift_for_woocommerce_send_event' );
 	}
 
 	/**
