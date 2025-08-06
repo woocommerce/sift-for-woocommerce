@@ -34,6 +34,8 @@ class Events {
 		'failed',
 	);
 
+	const MAX_EVENT_LENGTH = 8000;
+
 	/**
 	 * Set up the integration hooks for messages we want to send to Sift.
 	 *
@@ -925,6 +927,30 @@ class Events {
 	}
 
 	/**
+	 * Recursively remove empty properties from an array to clean data before sending to Sift.
+	 *
+	 * Removes null values, empty strings, and empty arrays while preserving valid zero values.
+	 * Operates recursively on nested arrays to ensure complete cleanup.
+	 *
+	 * @param array $data The array to clean of empty properties.
+	 *
+	 * @return array The cleaned array with empty properties removed.
+	 */
+	private static function recursively_remove_empty_properties( array $data ): array {
+		foreach ( $data as $key => $value ) {
+			if ( is_array( $value ) ) {
+				$data[ $key ] = self::recursively_remove_empty_properties( $value ); // Recurse into subarrays
+				if ( empty( $data[ $key ] ) ) {
+					unset( $data[ $key ] ); // Remove empty subarrays
+				}
+			} elseif ( null === $value || '' === $value ) { // Check for empty values, allowing 0
+				unset( $data[ $key ] );
+			}
+		}
+		return $data;
+	}
+
+	/**
 	 * Add a Sift Event to the async queue.
 	 *
 	 * @param string $event      The event to enqueue.
@@ -938,15 +964,45 @@ class Events {
 		$properties = apply_filters( 'sift_for_woocommerce_pre_send_event_properties', $properties, $event );
 
 		// Removed unused properties before queueing and storing the event
-		$properties = array_filter(
-			$properties,
-			function ( $value ) {
-				return null !== $value && '' !== $value;
-			}
-		);
+		$properties = self::recursively_remove_empty_properties( $properties );
 
 		if ( empty( $properties ) ) {
 			return;
+		}
+
+		// Prevent sending more data to the async queue than it can handle
+		if ( strlen( wp_json_encode( array( $event, $properties ) ) ) > self::MAX_EVENT_LENGTH ) {
+			// Compress the properties if they are too large
+			$data       = wp_json_encode( $properties );
+			$compressed = gzencode( $data, 9 );
+
+			if ( ! $compressed ) {
+				Sift_For_WooCommerce::log(
+					sprintf(
+						'Sift event "%s" larger than maximum %d characters and could not be compressed',
+						$event,
+						self::MAX_EVENT_LENGTH
+					),
+					'error',
+					array(
+						'source'     => 'sift-events',
+						'properties' => $properties,
+					)
+				);
+				return;
+			}
+
+			$properties = array( 'compressed' => $compressed );
+
+			Sift_For_WooCommerce::log(
+				sprintf(
+					'Sift event "%s" larger than maximum %d characters and has been compressed',
+					$event,
+					self::MAX_EVENT_LENGTH
+				),
+				'warning',
+				array( 'source' => 'sift-events' )
+			);
 		}
 
 		as_enqueue_async_action( 'async_sift_for_woocommerce_send_event', array( $event, $properties ) );
@@ -961,15 +1017,52 @@ class Events {
 	 * @return boolean
 	 */
 	public static function send_event( string $event, array $properties ): bool {
+		// Properties may have been compressed if they were too large
+		if ( array_key_exists( 'compressed', $properties ) ) {
+			$decompressed = gzdecode( $properties['compressed'] );
+			if ( false === $decompressed ) {
+				Sift_For_WooCommerce::log(
+					'Failed to decompress Sift event properties',
+					'error',
+					array(
+						'source' => 'sift-events',
+						'event'  => $event,
+					)
+				);
+				return false;
+			}
+
+			$properties = json_decode( $decompressed, true );
+			if ( null === $properties ) {
+				Sift_For_WooCommerce::log(
+					'Failed to decode decompressed Sift event properties',
+					'error',
+					array(
+						'source' => 'sift-events',
+						'event'  => $event,
+					)
+				);
+				return false;
+			}
+		}
+
+		if ( empty( $properties ) ) {
+			Sift_For_WooCommerce::log(
+				'Sift event "%s" missing properties',
+				'error',
+				array(
+					'source' => 'sift-events',
+					'event'  => $event,
+				)
+			);
+		}
+
+		// Remove blank properties before sending to sift.
+		$properties = self::recursively_remove_empty_properties( $properties );
 
 		$entry = array(
 			'event'      => $event,
-			'properties' => array_filter(
-				$properties,
-				function ( $value ) {
-					return null !== $value && '' !== $value;
-				}
-			),
+			'properties' => $properties,
 		);
 
 		$client = Sift_For_WooCommerce::get_api_client();
