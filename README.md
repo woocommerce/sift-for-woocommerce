@@ -43,14 +43,14 @@ If a decision is applied, it is sent to sift and stored locally in user_meta.
 Three body parameters are expected:
  - `decision_id`: REQUIRED: The decision to be applied to the user
  - `description` A description of the change which will be logged and sent to sift.
- - `analyst`:  The WPCOM username of the user making the request which will be logged and sent to sift.
+ - `analyst`:  The username of the user making the request which will be logged and sent to sift.
 
 ### Authentication
 API Requests must contain a valid `authorization` header.  Use the following to generate the hash:  
 `hash_hmac( 'sha256', "{$endpoint}|{$time}", $api_secret )`
 
 #### The following .env var is used as the `$api_secret` in the hash above:  
-`WCCOM_SIFT_FOR_WOOCOMMERCE_API_SECRET`
+`SIFT_FOR_WOOCOMMERCE_API_SECRET`
 
 ## Local Development
 

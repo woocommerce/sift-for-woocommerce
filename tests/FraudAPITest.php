@@ -80,10 +80,10 @@ class Fraud_API_Test extends \WP_UnitTestCase {
 	 * @return string API secret or empty string if not found.
 	 */
 	protected function get_api_secret(): string {
-		if ( getenv( 'WCCOM_SIFT_FOR_WOOCOMMERCE_API_SECRET' ) ) {
-			return getenv( 'WCCOM_SIFT_FOR_WOOCOMMERCE_API_SECRET' );
-		} elseif ( defined( 'WCCOM_SIFT_FOR_WOOCOMMERCE_API_SECRET' ) ) {
-			return WCCOM_SIFT_FOR_WOOCOMMERCE_API_SECRET;
+		if ( getenv( 'SIFT_FOR_WOOCOMMERCE_API_SECRET' ) ) {
+			return getenv( 'SIFT_FOR_WOOCOMMERCE_API_SECRET' );
+		} elseif ( defined( 'SIFT_FOR_WOOCOMMERCE_API_SECRET' ) ) {
+			return SIFT_FOR_WOOCOMMERCE_API_SECRET;
 		}
 		return '';
 	}

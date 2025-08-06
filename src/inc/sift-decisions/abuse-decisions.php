@@ -112,7 +112,7 @@ add_filter( 'sift_decision_received', __NAMESPACE__ . '\process_sift_decision_re
  * @param string $woocommerce_user_id ID of the WooCommerce user to whom the decision applies.
  * @param string $decision_id         The fraud decision ID to be processed.
  * @param string $description         Freeform text description of the fraud decision.
- * @param string $analyst             WPCOM username of the fraud analyst applying the decision.
+ * @param string $analyst             Username of the fraud analyst applying the decision.
  *
  * @return \WP_Error|boolean Returns a WP_Error if the user ID is invalid or if the decision ID is not recognized, otherwise true.
  */
@@ -240,7 +240,7 @@ add_filter( 'sift_for_woocommerce_save_last_fraud_decision', __NAMESPACE__ . '\s
  * @param string $woocommerce_user_id User to whom the decision applies.
  * @param string $decision_id         Decision ID as configured in the Sift dashboard.
  * @param string $description         Freeform text description of the decision.
- * @param string $analyst             WPCOM username of the fraud analyst.
+ * @param string $analyst             Username of the fraud analyst.
  *
  * @return \SiftResponse
  *

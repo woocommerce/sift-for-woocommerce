@@ -22,10 +22,10 @@ class REST_API {
 		add_action( 'rest_api_init', array( $this, 'register_endpoints' ) );
 
 		// If you need to regenerate the $api_secret, you can use bin2hex(random_bytes(48)).
-		if ( getenv( 'WCCOM_SIFT_FOR_WOOCOMMERCE_API_SECRET' ) ) {
-			$this->api_secret = getenv( 'WCCOM_SIFT_FOR_WOOCOMMERCE_API_SECRET' );
-		} elseif ( defined( 'WCCOM_SIFT_FOR_WOOCOMMERCE_API_SECRET' ) ) {
-			$this->api_secret = WCCOM_SIFT_FOR_WOOCOMMERCE_API_SECRET;
+		if ( getenv( 'SIFT_FOR_WOOCOMMERCE_API_SECRET' ) ) {
+			$this->api_secret = getenv( 'SIFT_FOR_WOOCOMMERCE_API_SECRET' );
+		} elseif ( defined( 'SIFT_FOR_WOOCOMMERCE_API_SECRET' ) ) {
+			$this->api_secret = SIFT_FOR_WOOCOMMERCE_API_SECRET;
 		}
 	}
 
@@ -106,7 +106,7 @@ class REST_API {
 							'required'    => false,
 						),
 						'analyst'     => array(
-							'description' => __( 'WPCOM username of the analyst making the decision.', 'sift-for-woocommerce' ),
+							'description' => __( 'Username of the analyst making the decision.', 'sift-for-woocommerce' ),
 							'type'        => 'string',
 							'required'    => false,
 						),
@@ -159,7 +159,7 @@ class REST_API {
 	 *
 	 * @return boolean|\WP_Error true or error object on failure.
 	 */
-	public function handle_apply_manual_fraud_decision( \WP_REST_Request $request ):bool|\WP_Error {
+	public function handle_apply_manual_fraud_decision( \WP_REST_Request $request ): bool|\WP_Error {
 		$user_id     = absint( $request->get_param( 'user_id' ) );
 		$decision_id = sanitize_text_field( $request->get_param( 'decision_id' ) );
 		$description = sanitize_text_field( $request->get_param( 'description' ) );
