@@ -129,13 +129,6 @@ class Events {
 			'$time'       => intval( 1000 * microtime( true ) ),
 		);
 
-		try {
-			SiftEventsValidator::validate_add_promotion( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
-
 		self::queue_sending_event( Sift_Event_Types::$add_promotion, $properties );
 	}
 
@@ -166,17 +159,6 @@ class Events {
 			'$ip'            => self::get_client_ip(),
 			'$time'          => intval( 1000 * microtime( true ) ),
 		);
-
-		if ( empty( $properties['$session_id'] ) ) {
-			unset( $properties['$session_id'] );
-		}
-
-		try {
-			SiftEventsValidator::validate_login( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
 
 		self::queue_sending_event( Sift_Event_Types::$login, $properties );
 	}
@@ -228,13 +210,6 @@ class Events {
 			'$time'         => intval( 1000 * microtime( true ) ),
 		);
 
-		try {
-			SiftEventsValidator::validate_login( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
-
 		if ( ! empty( $failure_reason ) ) {
 			$properties['$failure_reason'] = $failure_reason;
 		}
@@ -260,29 +235,16 @@ class Events {
 		$user = get_user_by( 'id', $user_id );
 
 		$properties = array(
-			'$user_id'          => self::format_user_id( $user->ID ),
-			'$session_id'       => \WC()->session?->get_customer_unique_id() ?? '',
-			'$user_email'       => $user->user_email ? $user->user_email : null,
-			'$name'             => $user->display_name,
-			'$phone'            => $user ? get_user_meta( $user->ID, 'billing_phone', true ) : null,
+			'$user_id'      => self::format_user_id( $user->ID ),
+			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
+			'$user_email'   => $user->user_email ? $user->user_email : null,
 			// '$referrer_user_id' => ??? -- required for detecting referral fraud, but non-standard to woocommerce.
-			'$payment_methods'  => self::get_customer_payment_methods( $user->ID ),
-			'$billing_address'  => self::get_customer_address( $user->ID, 'billing' ),
-			'$shipping_address' => self::get_customer_address( $user->ID, 'shipping' ),
-			'$browser'          => self::get_client_browser(),
-			'$account_types'    => $user->roles,
-			'$site_domain'      => wp_parse_url( site_url(), PHP_URL_HOST ),
-			'$site_country'     => wc_get_base_location()['country'],
-			'$ip'               => self::get_client_ip(),
-			'$time'             => intval( 1000 * microtime( true ) ),
+			'$browser'      => self::get_client_browser(),
+			'$site_domain'  => wp_parse_url( site_url(), PHP_URL_HOST ),
+			'$site_country' => wc_get_base_location()['country'],
+			'$ip'           => self::get_client_ip(),
+			'$time'         => intval( 1000 * microtime( true ) ),
 		);
-
-		try {
-			SiftEventsValidator::validate_create_account( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
 
 		self::queue_sending_event(
 			Sift_Event_Types::$create_account,
@@ -315,32 +277,16 @@ class Events {
 		}
 
 		$properties = array(
-			'$user_id'          => self::format_user_id( $user->ID ),
-			'$user_email'       => $user->user_email ? $user->user_email : null,
-			'$name'             => $user->display_name,
-			'$phone'            => $user ? get_user_meta( $user->ID, 'billing_phone', true ) : null,
+			'$user_id'      => self::format_user_id( $user->ID ),
+			'$user_email'   => $user->user_email ? $user->user_email : null,
 			// '$referrer_user_id' => ??? -- required for detecting referral fraud, but non-standard to woocommerce.
-			'$payment_methods'  => self::get_customer_payment_methods( $user->ID ),
-			'$billing_address'  => self::get_customer_address( $user->ID, 'billing' ),
-			'$shipping_address' => self::get_customer_address( $user->ID, 'shipping' ),
-			'$browser'          => self::get_client_browser(),
-			'$account_types'    => $user->roles,
-			'$site_domain'      => wp_parse_url( site_url(), PHP_URL_HOST ),
-			'$site_country'     => wc_get_base_location()['country'],
-			'$ip'               => self::get_client_ip(),
-			'$time'             => intval( 1000 * microtime( true ) ),
+			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
+			'$browser'      => self::get_client_browser(),
+			'$site_domain'  => wp_parse_url( site_url(), PHP_URL_HOST ),
+			'$site_country' => wc_get_base_location()['country'],
+			'$ip'           => self::get_client_ip(),
+			'$time'         => intval( 1000 * microtime( true ) ),
 		);
-
-		if ( empty( $properties['$payment_methods'] ) ) {
-			unset( $properties['$payment_methods'] );
-		}
-
-		try {
-			SiftEventsValidator::validate_update_account( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
 
 		self::queue_sending_event( Sift_Event_Types::$update_account, $properties );
 	}
@@ -364,10 +310,8 @@ class Events {
 			return;
 		}
 
-		$user = get_user_by( 'id', $user_id );
-
 		$properties = array(
-			'$user_id'      => self::format_user_id( $user->ID ),
+			'$user_id'      => self::format_user_id( intval( $user_id ) ),
 			'$reason'       => '$user_update', // Can alternately be `$forgot_password` or `$forced_reset` -- no real way to set those yet.
 			'$status'       => '$success', // This action only fires after the change is done.
 			'$browser'      => self::get_client_browser(),
@@ -376,13 +320,6 @@ class Events {
 			'$ip'           => self::get_client_ip(),
 			'$time'         => intval( 1000 * microtime( true ) ),
 		);
-
-		try {
-			SiftEventsValidator::validate_update_password( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
 
 		self::queue_sending_event( Sift_Event_Types::$update_password, $properties );
 	}
@@ -409,13 +346,6 @@ class Events {
 			'$ip'         => self::get_client_ip(),
 			'$time'       => intval( 1000 * microtime( true ) ),
 		);
-
-		try {
-			SiftEventsValidator::validate_link_session_to_user( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
 
 		self::queue_sending_event( Sift_Event_Types::$link_session_to_user, $properties );
 	}
@@ -450,14 +380,9 @@ class Events {
 			'$user_email'   => $user->user_email ?? null,
 			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
 			'$item'         => array(
-				'$item_id'       => (string) $cart_item_key,
-				'$sku'           => $product->get_sku(),
-				'$product_title' => $product->get_title(),
-				'$price'         => self::get_transaction_micros( floatval( $product->get_price() ) ),
-				'$currency_code' => get_woocommerce_currency(),
-				'$quantity'      => $cart_item['quantity'],
-				'$category'      => self::get_product_category( $product ),
-				'$tags'          => wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' ),
+				'$item_id'   => (string) $cart_item_key,
+				'product_id' => $product->get_id(), // Store product ID for later lookup (no $ prefix - internal use)
+				'$quantity'  => $cart_item['quantity'],
 			),
 			'$browser'      => self::get_client_browser(),
 			'$site_domain'  => wp_parse_url( site_url(), PHP_URL_HOST ),
@@ -465,13 +390,6 @@ class Events {
 			'$ip'           => self::get_client_ip(),
 			'$time'         => intval( 1000 * microtime( true ) ),
 		);
-
-		try {
-			SiftEventsValidator::validate_add_item_to_cart( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
 
 		self::queue_sending_event(
 			Sift_Event_Types::$add_item_to_cart,
@@ -508,14 +426,9 @@ class Events {
 			'$user_email'   => $user->user_email ? $user->user_email : null,
 			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
 			'$item'         => array(
-				'$item_id'       => (string) $product->get_id(),
-				'$sku'           => $product->get_sku(),
-				'$product_title' => $product->get_title(),
-				'$price'         => self::get_transaction_micros( floatval( $product->get_price() ) ),
-				'$currency_code' => get_woocommerce_currency(),
-				'$quantity'      => $cart_item['quantity'],
-				'$category'      => self::get_product_category( $product ),
-				'$tags'          => wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' ),
+				'$item_id'   => (string) $product->get_id(),
+				'product_id' => $product->get_id(), // Store product ID for later lookup (no $ - internal use)
+				'$quantity'  => $cart_item['quantity'],
 			),
 			'$browser'      => self::get_client_browser(),
 			'$site_domain'  => wp_parse_url( site_url(), PHP_URL_HOST ),
@@ -577,89 +490,13 @@ class Events {
 			return;
 		}
 
-		$sift_order = Sift_For_WooCommerce::get_sift_order_from_wc_order( $order );
-
-		$browser = self::get_client_browser();
-		$ip      = $order->get_customer_ip_address() ?? self::get_client_ip();
-
 		$properties = array(
-			'$user_id'            => self::format_user_id( $order->get_user_id() ),
-			'$session_id'         => WC()->session?->get_customer_unique_id() ?? '',
-			'$order_id'           => $order_id,
-			'$user_email'         => $order->get_billing_email(),
-			'$verification_phone_number'
-				=> str_starts_with( $order->get_billing_phone(), '+' ) ? preg_replace( '/[^0-9+]/', '', $order->get_billing_phone() ) : null,
-			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ),
-			'$payment_methods'    => $sift_order->get_payment_methods(),
-			'$currency_code'      => $order->get_currency(),
-			'$billing_address'    => self::get_order_address( $order_id, 'billing' ),
-			'$shipping_address'   => self::get_order_address( $order_id, 'shipping' ),
-			'$expedited_shipping' => false,
-			'$items'              => array(),
-			'$browser'            => $browser,
-			'$ip'                 => $ip,
-			'$time'               => intval( 1000 * microtime( true ) ),
+			'$session_id' => WC()->session?->get_customer_unique_id() ?? '',
+			'$order_id'   => $order_id,
+			'$browser'    => self::get_client_browser(),
+			'$ip'         => self::get_client_ip(),
+			'$time'       => intval( 1000 * microtime( true ) ),
 		);
-
-		/**
-		* Add the meta data.
-		*
-		* @var WC_Order_Item_Product $item
-		*/
-		foreach ( $order->get_items() as $item ) {
-			$product = $item->get_product();
-
-			if ( ! ( $product instanceof WC_Product ) ) {
-				Sift_For_WooCommerce::log(
-					sprintf( 'Product cannot be found for WC_Order_Item_Product: %s', $item->get_id() ),
-					'debug',
-					array( 'source' => 'sift-order-product' )
-				);
-				continue;
-			}
-
-			$sku = empty( $product->get_sku() ) ? $product->get_id() : $product->get_sku();
-
-			// Construct item with ONLY fields specified in Sift API documentation.
-			$properties['$items'][] = array(
-				'$item_id'       => (string) $sku,
-				'$product_title' => $product->get_name(),
-				'$price'         => self::get_transaction_micros( floatval( $product->get_price() ) ),
-				'$quantity'      => intval( $item->get_quantity() ),
-				'$currency_code' => $order->get_currency(),
-				'$category'      => self::get_product_category( $product ) ? self::get_product_category( $product ) : 'Uncategorized',
-			);
-		}
-
-		// Detect free orders.
-		$is_free_order = self::is_free_order( $order );
-
-		// Handle free orders by making required adjustments to properties.
-		if ( $is_free_order ) {
-			// Remove payment methods entirely for free orders.
-			unset( $properties['$payment_methods'] );
-		}
-
-		// If session ID is empty, create one for this order.
-		if ( empty( $properties['$session_id'] ) ) {
-			$properties['$session_id'] = 'order_session_' . $order_id;
-		}
-
-		try {
-			SiftEventsValidator::validate_create_or_update_order( $properties );
-		} catch ( \Exception $e ) {
-			// Log validation error in detail.
-			Sift_For_WooCommerce::log(
-				sprintf( 'Validation error for %s event: %s', $event, $e->getMessage() ),
-				'error',
-				array(
-					'source'     => 'sift-order-events',
-					'order_id'   => $order_id,
-					'properties' => wp_json_encode( $properties ),
-				)
-			);
-			return;
-		}
 
 		// Add event to queue.
 		self::queue_sending_event( $event, $properties );
@@ -706,13 +543,6 @@ class Events {
 			'$transaction_status' => $status,
 			'$time'               => intval( 1000 * microtime( true ) ),
 		);
-
-		try {
-			SiftEventsValidator::validate_transaction( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
 
 		self::queue_sending_event( Sift_Event_Types::$transaction, $properties );
 	}
@@ -795,13 +625,6 @@ class Events {
 			$properties['$analyst'] = wp_get_current_user()->user_login;
 		}
 
-		try {
-			SiftEventsValidator::validate_order_status( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
-
 		self::queue_sending_event( Sift_Event_Types::$order_status, $properties );
 	}
 
@@ -829,13 +652,6 @@ class Events {
 			'$chargeback_reason' => $chargeback_reason,
 			'$ip'                => self::get_client_ip(),
 		);
-
-		try {
-			SiftEventsValidator::validate_chargeback( $properties );
-		} catch ( \Exception $e ) {
-			Sift_For_WooCommerce::log( esc_html( $e->getMessage() ), 'error' );
-			return;
-		}
 
 		self::queue_sending_event( Sift_Event_Types::$chargeback, $properties );
 	}
@@ -1011,10 +827,17 @@ class Events {
 	/**
 	 * Send off events to Sift. This is run async thanks to Action Scheduler.
 	 *
-	 * @param string $event      Event type to send.
-	 * @param array  $properties Properties of the Sift event.
+	 * Handles the complete async event processing pipeline:
+	 * 1. Hydrates minimal data into full properties via hydrate_event_properties()
+	 * 2. Removes empty properties for clean data
+	 * 3. Validates all properties via validate_event_properties()
+	 * 4. Sends to Sift API and handles responses
+	 * 5. Retrieves and applies fraud decisions if available
 	 *
-	 * @return boolean
+	 * @param string $event      Event type to send.
+	 * @param array  $properties Properties of the Sift event (may be minimal for lazy loading).
+	 *
+	 * @return boolean True if event was sent successfully, false on failure.
 	 */
 	public static function send_event( string $event, array $properties ): bool {
 		// Properties may have been compressed if they were too large
@@ -1055,15 +878,19 @@ class Events {
 					'event'  => $event,
 				)
 			);
+			return false;
 		}
 
-		// Remove blank properties before sending to sift.
+		// Hydrate full properties from job data if needed
+		$properties = self::hydrate_event_properties( $event, $properties );
+
+		// Remove blank properties before sending to Sift API
 		$properties = self::recursively_remove_empty_properties( $properties );
 
-		$entry = array(
-			'event'      => $event,
-			'properties' => $properties,
-		);
+		// Validate the full properties before sending to Sift API
+		if ( ! self::validate_event_properties( $event, $properties ) ) {
+			return false;
+		}
 
 		$client = Sift_For_WooCommerce::get_api_client();
 		if ( empty( $client ) ) {
@@ -1073,31 +900,30 @@ class Events {
 				array(
 					'source' => 'sift-for-woocommerce',
 					'reason' => 'Failed to get the Sift API client.',
-					'event'  => $entry,
+					'event'  => array( $event, $properties ),
 				)
 			);
 			return false;
 		}
 
-		// We need the original user ID to handle the decision locally after events are sent.
-		$user_id = $entry['properties']['$user_id'] ?? null;
-
-		$response = $client->track( $entry['event'], $entry['properties'] );
+		// Send to Sift API
+		$response = $client->track( $event, $properties );
 
 		if ( 200 !== $response->httpStatusCode ) {
 			Sift_For_WooCommerce::log(
-				sprintf( 'Sent `%s`, Error %d: %s', $entry['event'], $response->apiStatus, $response->apiErrorMessage ),
+				sprintf( 'Sent `%s`, Error %d: %s', $event, $response->apiStatus, $response->apiErrorMessage ),
 				'error',
 				array(
 					'source'     => 'sift-for-woocommerce',
-					'properties' => $entry['properties'],
+					'properties' => $properties,
 					'response'   => $response,
 				)
 			);
+			return false;
 		}
 
-		// Get the user ID we sent to Sift from the properties.
-		$sift_user_id = $entry['properties']['$user_id'] ?? null;
+		// Get decisions if user ID is available
+		$sift_user_id = $properties['$user_id'] ?? null;
 
 		// Get the current decision since events have been sent and could have changed the decision.
 		// This is only done if the user ID is set.
@@ -1286,6 +1112,8 @@ class Events {
 
 		$taxonomy  = 'product_cat'; // Taxonomy for product category
 		$terms_ids = $product->get_category_ids();
+		$output    = array();
+
 		// Loop though terms ids (product categories)
 		foreach ( $terms_ids as $term_id ) {
 			$term_names = array(); // Initialising category array
@@ -1344,5 +1172,282 @@ class Events {
 		}
 
 		return $payment_methods;
+	}
+
+	/**
+	 * Hydrate full event properties from job data based on event type.
+	 *
+	 * Routes events to appropriate hydration methods to rebuild full data from
+	 * identifiers queued during the request.
+	 *
+	 * @param string $event      The event type.
+	 * @param array  $properties The properties to hydrate with full data.
+	 *
+	 * @return array The hydrated properties, or original properties if no hydration is needed.
+	 */
+	public static function hydrate_event_properties( string $event, array $properties ): array {
+		switch ( $event ) {
+			case '$create_order':
+			case '$update_order':
+					$properties = self::hydrate_order_properties( $event, $properties );
+				break;
+
+			case '$add_item_to_cart':
+			case '$remove_item_from_cart':
+					$properties = self::hydrate_cart_properties( $event, $properties );
+				break;
+
+			case '$create_account':
+			case '$update_account':
+					$properties = self::hydrate_account_properties( $event, $properties );
+				break;
+		}
+
+		return $properties;
+	}
+
+	/**
+	 * Validate event properties based on event type
+	 *
+	 * Routes events to appropriate SiftEventsValidator methods and handles all validation
+	 * errors with consistent logging. This ensures all events are validated before sending
+	 * to the Sift API.
+	 *
+	 * @param string $event      The event type.
+	 * @param array  $properties The event properties to validate.
+	 *
+	 * @return boolean True if validation passes, false if validation fails.
+	 */
+	public static function validate_event_properties( string $event, array $properties ): bool {
+		try {
+			switch ( $event ) {
+				case '$add_item_to_cart':
+					SiftEventsValidator::validate_add_item_to_cart( $properties );
+					break;
+				case '$remove_item_from_cart':
+					SiftEventsValidator::validate_remove_item_from_cart( $properties );
+					break;
+				case '$create_order':
+				case '$update_order':
+					SiftEventsValidator::validate_create_or_update_order( $properties );
+					break;
+				case '$create_account':
+					SiftEventsValidator::validate_create_account( $properties );
+					break;
+				case '$update_account':
+					SiftEventsValidator::validate_update_account( $properties );
+					break;
+				case '$update_password':
+					SiftEventsValidator::validate_update_password( $properties );
+					break;
+				case '$login':
+					SiftEventsValidator::validate_login( $properties );
+					break;
+				case '$logout':
+					SiftEventsValidator::validate_logout( $properties );
+					break;
+				case '$transaction':
+					SiftEventsValidator::validate_transaction( $properties );
+					break;
+				case '$order_status':
+					SiftEventsValidator::validate_order_status( $properties );
+					break;
+				case '$add_promotion':
+					SiftEventsValidator::validate_add_promotion( $properties );
+					break;
+				case '$link_session_to_user':
+					SiftEventsValidator::validate_link_session_to_user( $properties );
+					break;
+				case '$chargeback':
+					SiftEventsValidator::validate_chargeback( $properties );
+					break;
+				default:
+					// No specific validation for unknown event types
+					break;
+			}
+		} catch ( \Exception $e ) {
+			Sift_For_WooCommerce::log(
+				sprintf( 'Validation error for %s event: %s', $event, $e->getMessage() ),
+				'error',
+				array(
+					'source'     => 'sift-events-validation',
+					'event'      => $event,
+					'properties' => wp_json_encode( $properties ),
+				)
+			);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Hydrate cart event properties by rebuilding full product details from job data.
+	 *
+	 * @param string $event      The event type ('$add_item_to_cart' or '$remove_item_from_cart').
+	 * @param array  $properties The properties to hydrate with full cart data.
+	 *
+	 * @return array The hydrated cart properties with full product details.
+	 */
+	public static function hydrate_cart_properties( string $event, array $properties ): array {
+		$product_id = $properties['$item']['product_id'] ?? null;
+		$product    = false;
+
+		if ( $product_id ) {
+			// Look up product details using stored product_id
+			$product = wc_get_product( $product_id );
+		}
+
+		if ( ! $product ) {
+			Sift_For_WooCommerce::log(
+				sprintf( 'Product %s not found for %s event', $product_id, $event ),
+				'error',
+				array( 'source' => 'sift-events' )
+			);
+
+			// Clean up internal fields that shouldn't be sent to Sift
+			if ( isset( $properties['$item']['product_id'] ) ) {
+				unset( $properties['$item']['product_id'] );
+			}
+
+			// Return properties as-is if product not found
+			return $properties;
+		}
+
+		// Add full product details to existing $item array
+		$properties['$item']['$sku']           = $product->get_sku();
+		$properties['$item']['$product_title'] = $product->get_title();
+		$properties['$item']['$price']         = self::get_transaction_micros( floatval( $product->get_price() ) );
+		$properties['$item']['$currency_code'] = get_woocommerce_currency();
+		$properties['$item']['$category']      = self::get_product_category( $product );
+		$properties['$item']['$tags']          = wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' );
+
+		// Clean up internal product_id field
+		unset( $properties['$item']['product_id'] );
+
+		return $properties;
+	}
+
+	/**
+	 * Hydrate account event properties by rebuilding full user details from job data.
+	 *
+	 * @param string $event      The event type ('$create_account' or '$update_account').
+	 * @param array  $properties The properties to hydrate with full account data.
+	 *
+	 * @return array The hydrated account properties with full user details.
+	 */
+	public static function hydrate_account_properties( string $event, array $properties ): array {
+
+		$user    = false;
+		$user_id = $properties['$user_id'] ?? null;
+
+		if ( $user_id ) {
+			// Look up user details using stored user_id
+			$user = get_user_by( 'id', intval( $properties['$user_id'] ) );
+		}
+
+		if ( ! $user ) {
+			Sift_For_WooCommerce::log(
+				sprintf( 'User %s not found for %s event', $user_id, $event ),
+				'error',
+				array( 'source' => 'sift-events' )
+			);
+			// Return properties as-is if user not found
+			return $properties;
+		}
+
+		// Add full user details to existing properties
+		$properties['$name']             = $user->display_name;
+		$properties['$phone']            = get_user_meta( $user->ID, 'billing_phone', true );
+		$properties['$payment_methods']  = self::get_customer_payment_methods( $user->ID );
+		$properties['$billing_address']  = self::get_customer_address( $user->ID, 'billing' );
+		$properties['$shipping_address'] = self::get_customer_address( $user->ID, 'shipping' );
+		$properties['$account_types']    = $user->roles;
+
+		return $properties;
+	}
+
+	/**
+	 * Hydrate order event properties by rebuilding full order details from job data.
+	 *
+	 * @param string $event      The event type ('$create_order' or '$update_order').
+	 * @param array  $properties The properties to hydrate with full order data.
+	 *
+	 * @return array The hydrated order properties with full order details.
+	 */
+	public static function hydrate_order_properties( string $event, array $properties ): array {
+		$order    = false;
+		$order_id = $properties['$order_id'] ?? null;
+
+		if ( $order_id ) {
+			$order = wc_get_order( $order_id );
+		}
+
+		if ( ! $order ) {
+			Sift_For_WooCommerce::log(
+				sprintf( 'Order %s not found for %s event', $order_id, $event ),
+				'error',
+				array( 'source' => 'sift-events' )
+			);
+
+			return $properties;
+		}
+
+		// Use the existing update_or_create_order logic to rebuild full properties
+		$sift_order = Sift_For_WooCommerce::get_sift_order_from_wc_order( $order );
+
+		// Add full order details to existing properties
+		$properties['$user_id']                   = self::format_user_id( $order->get_user_id() );
+		$properties['$order_id']                  = (string) $order->get_id();
+		$properties['$user_email']                = $order->get_billing_email();
+		$properties['$verification_phone_number'] = str_starts_with( $order->get_billing_phone(), '+' ) ? preg_replace( '/[^0-9+]/', '', $order->get_billing_phone() ) : null;
+		$properties['$amount']                    = self::get_transaction_micros( floatval( $order->get_total() ) );
+		$properties['$currency_code']             = $order->get_currency();
+		$properties['$billing_address']           = self::get_order_address( (string) $order->get_id(), 'billing' );
+		$properties['$shipping_address']          = self::get_order_address( (string) $order->get_id(), 'shipping' );
+		$properties['$expedited_shipping']        = false;
+		$properties['$items']                     = array();
+
+		// Handle free orders
+		if ( ! self::is_free_order( $order ) ) {
+			$properties['$payment_methods'] = $sift_order->get_payment_methods();
+		}
+
+		// Override IP with order's IP if available
+		if ( $order->get_customer_ip_address() ) {
+			$properties['$ip'] = $order->get_customer_ip_address();
+		}
+
+		// Add the order items
+		foreach ( $order->get_items() as $item ) {
+			$product = $item->get_product();
+
+			if ( ! ( $product instanceof \WC_Product ) ) {
+				Sift_For_WooCommerce::log(
+					sprintf( 'Product cannot be found for WC_Order_Item_Product: %s', $item->get_id() ),
+					'debug',
+					array( 'source' => 'sift-order-product' )
+				);
+				continue;
+			}
+
+			$sku = empty( $product->get_sku() ) ? $product->get_id() : $product->get_sku();
+
+			$properties['$items'][] = array(
+				'$item_id'       => (string) $sku,
+				'$product_title' => $product->get_name(),
+				'$price'         => self::get_transaction_micros( floatval( $product->get_price() ) ),
+				'$quantity'      => intval( $item->get_quantity() ),
+				'$currency_code' => $order->get_currency(),
+				'$category'      => self::get_product_category( $product ) ? self::get_product_category( $product ) : 'Uncategorized',
+			);
+		}
+
+		// Create session ID if empty
+		if ( empty( $properties['$session_id'] ) ) {
+			$properties['$session_id'] = 'order_session_' . $order->get_id();
+		}
+
+		return $properties;
 	}
 }

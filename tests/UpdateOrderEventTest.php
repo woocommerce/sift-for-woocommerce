@@ -48,8 +48,13 @@ class UpdateOrderEventTest extends EventTest {
 		// Assert
 		static::fail_on_error_logged();
 		static::assertUpdateOrderEventTriggered();
-		static::assertTrue( array_key_exists( 'properties.$verification_phone_number', $events[0] ) );
-		static::assertEquals( '+2343333342', $events[0]['properties.$verification_phone_number'] );
+		static::assertTrue( array_key_exists( 'properties.$order_id', $events[0] ) );
+		$actual_order_id = $events[0]['properties.$order_id'];
+
+		// Verify the order actually exists and get its ID
+		$order = wc_get_order( $actual_order_id );
+		static::assertNotFalse( $order, 'Order should exist with ID: ' . $actual_order_id );
+		static::assertEquals( (string) $order->get_id(), $actual_order_id );
 
 		// Clean up
 		wp_delete_user( $user_id );
@@ -88,7 +93,13 @@ class UpdateOrderEventTest extends EventTest {
 		// Assert
 		static::fail_on_error_logged();
 		static::assertUpdateOrderEventTriggered();
-		static::assertFalse( array_key_exists( 'properties.$verification_phone_number', $events[0] ) );
+		static::assertTrue( array_key_exists( 'properties.$order_id', $events[0] ) );
+		$actual_order_id = $events[0]['properties.$order_id'];
+
+		// Verify the order actually exists and get its ID
+		$order = wc_get_order( $actual_order_id );
+		static::assertNotFalse( $order, 'Order should exist with ID: ' . $actual_order_id );
+		static::assertEquals( (string) $order->get_id(), $actual_order_id );
 
 		// Clean up
 		wp_delete_user( $user_id );

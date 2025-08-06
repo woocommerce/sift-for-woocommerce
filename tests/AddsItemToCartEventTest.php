@@ -37,8 +37,8 @@ class AddsItemToCartEventTest extends EventTest {
 		$product = wc_get_product( $product_id ?? static::$product_id );
 		$events  = static::filter_events(
 			[
-				'event'                 => '$add_item_to_cart',
-				'properties.$item.$sku' => $product->get_sku(),
+				'event'                       => '$add_item_to_cart',
+				'properties.$item.product_id' => $product->get_id(),
 			]
 		);
 		static::assertGreaterThanOrEqual( 1, count( $events ), 'No $add_item_to_cart event found.' );

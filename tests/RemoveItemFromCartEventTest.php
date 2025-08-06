@@ -62,8 +62,8 @@ class RemoveItemFromCartEventTest extends EventTest {
 		// Assert
 		$events = static::filter_events(
 			[
-				'event'                 => '$remove_item_from_cart',
-				'properties.$item.$sku' => $sku,
+				'event'                       => '$remove_item_from_cart',
+				'properties.$item.product_id' => static::$product_id,
 			]
 		);
 		static::assertEquals( 0, count( $events ), 'No $remove_item_from_cart event should be found for removed product.' );
@@ -82,8 +82,8 @@ class RemoveItemFromCartEventTest extends EventTest {
 		$product = wc_get_product( $product_id ?? static::$product_id );
 		$events  = static::filter_events(
 			[
-				'event'                 => '$remove_item_from_cart',
-				'properties.$item.$sku' => $product->get_sku(),
+				'event'                       => '$remove_item_from_cart',
+				'properties.$item.product_id' => $product->get_id(),
 			]
 		);
 		static::assertGreaterThanOrEqual( 1, count( $events ), 'No $remove_item_from_cart event found.' );
