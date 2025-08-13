@@ -26,8 +26,6 @@ class Fraud_Decision_Test extends \WP_UnitTestCase {
 
 		//Get the latest decision for the user
 		$last_decision_id = Abuse_Decisions\get_last_fraud_decision( $user_id );
-
-		//
 		self::assertEquals( $last_decision_id, $newest_decision_id, 'Decision retrieval failed' );
 		wp_delete_user( $user_id );
 	}
