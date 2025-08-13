@@ -783,16 +783,30 @@ class Events {
 		$properties = self::recursively_remove_empty_properties( $properties );
 
 		if ( empty( $properties ) ) {
+			Sift_For_WooCommerce::log(
+				'Failed to queue Sift event',
+				'error',
+				array(
+					'source' => 'sift-for-woocommerce',
+					'reason' => 'Empty properties',
+					'event'  => $event,
+				)
+			);
 			return;
 		}
 
 		// Prevent sending more data to the async queue than it can handle
 		if ( strlen( wp_json_encode( array( $event, $properties ) ) ) > self::MAX_EVENT_LENGTH ) {
 			// Compress the properties if they are too large
-			$data       = wp_json_encode( $properties );
-			$compressed = gzencode( $data, 9 );
+			$data                    = wp_json_encode( $properties );
+			$compressed              = gzencode( $data, 9 );
+			$compressed_event_length = strlen(
+				wp_json_encode(
+					array( $event, array( 'compressed' => $compressed ) )
+				)
+			);
 
-			if ( ! $compressed ) {
+			if ( ! $compressed || $compressed_event_length > self::MAX_EVENT_LENGTH ) {
 				Sift_For_WooCommerce::log(
 					sprintf(
 						'Sift event "%s" larger than maximum %d characters and could not be compressed',
