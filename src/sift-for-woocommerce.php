@@ -9,6 +9,7 @@ require_once __DIR__ . '/inc/tracking-js.php';
 require_once __DIR__ . '/inc/payment-gateways/load.php';
 require_once __DIR__ . '/inc/sift-events/sift-events.php';
 require_once __DIR__ . '/inc/sift-decisions/abuse-decisions.php';
+require_once __DIR__ . '/inc/rest-api.php';
 
 defined( 'ABSPATH' ) || exit;
 
@@ -52,6 +53,9 @@ class Sift_For_WooCommerce {
 		 * Action to load the sidecar plugin.
 		 */
 		do_action( 'sift_for_woocommerce_load_sidecar_plugin' );
+
+		// Load the REST API
+		REST_API::instance();
 	}
 
 	/**
