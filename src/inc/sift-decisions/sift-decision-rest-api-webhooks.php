@@ -97,8 +97,8 @@ function decision_webhook( \WP_REST_Request $request ) {
 		'sift_decision_received',
 		null,
 		$json['decision']['id'],
-		$json['entity']['type'],
 		$json['entity']['id'],
+		$json['entity']['type'],
 		$json['time']
 	);
 

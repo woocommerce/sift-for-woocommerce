@@ -37,7 +37,8 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 		return $woocommerce_user_id;
 	}
 
-	$automated_actions_enabled = get_option( 'wc_sift_for_woocommerce_automated_actions_enabled' );
+	// Checkbox options are "yes" or "no" values
+	$automated_actions_enabled = ( 'yes' === get_option( 'wc_sift_for_woocommerce_automated_actions_enabled' ) );
 
 	switch ( $decision_id ) {
 		case 'looks_good_payment_abuse':
@@ -49,6 +50,7 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 		case 'likely_fraud_keep_purchases_payment_abuse':
 			if ( $automated_actions_enabled ) {
 				do_action( 'sift_for_woocommerce_likely_fraud_keep_purchases_payment_abuse', $woocommerce_user_id );
+				do_action( 'sift_for_woocommerce_send_decision_notification', $woocommerce_user_id, 'making purchases' );
 			}
 			break;
 
