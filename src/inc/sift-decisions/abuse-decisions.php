@@ -119,7 +119,8 @@ add_filter( 'sift_decision_received', __NAMESPACE__ . '\process_sift_decision_re
  * @return \WP_Error|boolean Returns a WP_Error if the user ID is invalid or if the decision ID is not recognized, otherwise true.
  */
 function process_manual_fraud_decision( string $woocommerce_user_id, string $decision_id, string $description, string $analyst ): \WP_Error|bool {
-	if ( empty( $woocommerce_user_id ) ) {
+	$user = get_user_by( 'id', $woocommerce_user_id );
+	if ( ! $user || is_wp_error( $user ) ) {
 		wc_get_logger()->log(
 			'info',
 			"Bad User ID '{$woocommerce_user_id}'",
