@@ -37,7 +37,8 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 		return $woocommerce_user_id;
 	}
 
-	$automated_actions_enabled = get_option( 'wc_sift_for_woocommerce_automated_actions_enabled' );
+	// Checkbox options are "yes" or "no" values
+	$automated_actions_enabled = ( 'yes' === get_option( 'wc_sift_for_woocommerce_automated_actions_enabled' ) );
 
 	switch ( $decision_id ) {
 		case 'looks_good_payment_abuse':
@@ -49,6 +50,7 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 		case 'likely_fraud_keep_purchases_payment_abuse':
 			if ( $automated_actions_enabled ) {
 				do_action( 'sift_for_woocommerce_likely_fraud_keep_purchases_payment_abuse', $woocommerce_user_id );
+				do_action( 'sift_for_woocommerce_send_decision_notification', $woocommerce_user_id, 'making purchases' );
 			}
 			break;
 
@@ -117,7 +119,8 @@ add_filter( 'sift_decision_received', __NAMESPACE__ . '\process_sift_decision_re
  * @return \WP_Error|boolean Returns a WP_Error if the user ID is invalid or if the decision ID is not recognized, otherwise true.
  */
 function process_manual_fraud_decision( string $woocommerce_user_id, string $decision_id, string $description, string $analyst ): \WP_Error|bool {
-	if ( empty( $woocommerce_user_id ) ) {
+	$user = get_user_by( 'id', $woocommerce_user_id );
+	if ( ! $user || is_wp_error( $user ) ) {
 		wc_get_logger()->log(
 			'info',
 			"Bad User ID '{$woocommerce_user_id}'",
