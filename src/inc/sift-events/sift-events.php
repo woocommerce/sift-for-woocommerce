@@ -492,7 +492,8 @@ class Events {
 
 		$properties = array(
 			'$session_id' => WC()->session?->get_customer_unique_id() ?? '',
-			'$order_id'   => $order_id,
+			'$order_id'   => (string) $order->get_id(),
+			'$user_id'    => self::format_user_id( $order->get_user_id() ),
 			'$browser'    => self::get_client_browser(),
 			'$ip'         => self::get_client_ip(),
 			'$time'       => intval( 1000 * microtime( true ) ),
@@ -775,10 +776,6 @@ class Events {
 	 * @return void
 	 */
 	public static function queue_sending_event( string $event, array $properties ): void {
-
-		// Give a chance for the platform to modify the data (and add potentially new custom data)
-		$properties = apply_filters( 'sift_for_woocommerce_pre_send_event_properties', $properties, $event );
-
 		// Removed unused properties before queueing and storing the event
 		$properties = self::recursively_remove_empty_properties( $properties );
 
@@ -898,8 +895,24 @@ class Events {
 		// Hydrate full properties from job data if needed
 		$properties = self::hydrate_event_properties( $event, $properties );
 
+		// Give a chance for the platform to modify the data (and add potentially new custom data)
+		$properties = apply_filters( 'sift_for_woocommerce_pre_send_event_properties', $properties, $event );
+
 		// Remove blank properties before sending to Sift API
 		$properties = self::recursively_remove_empty_properties( $properties );
+
+		if ( empty( $properties ) ) {
+			Sift_For_WooCommerce::log(
+				'Failed to send Sift event',
+				'debug',
+				array(
+					'source' => 'sift-for-woocommerce',
+					'reason' => 'Empty properties',
+					'event'  => $event,
+				)
+			);
+			return false;
+		}
 
 		// Validate the full properties before sending to Sift API
 		if ( ! self::validate_event_properties( $event, $properties ) ) {
@@ -1037,18 +1050,12 @@ class Events {
 	/**
 	 * Get the address details in the format that Sift expects.
 	 *
-	 * @param string $order_id The User / Customer ID.
-	 * @param string $type     Either `billing` or `shipping`.
+	 * @param \WC_Order $order The Order object.
+	 * @param string    $type  Either `billing` or `shipping`.
 	 *
 	 * @return array|null
 	 */
-	private static function get_order_address( string $order_id, string $type = 'billing' ): ?array {
-		$order = wc_get_order( $order_id );
-
-		if ( empty( $order ) ) {
-			return null;
-		}
-
+	private static function get_order_address( \WC_Order $order, string $type = 'billing' ): ?array {
 		switch ( strtolower( $type ) ) {
 			// WC_Order doesn't have the same `->get_billing` and `->get_shipping()` that the Customer object
 			// has, so we call this way instead.  It also assumes `view`
@@ -1411,14 +1418,12 @@ class Events {
 		$sift_order = Sift_For_WooCommerce::get_sift_order_from_wc_order( $order );
 
 		// Add full order details to existing properties
-		$properties['$user_id']                   = self::format_user_id( $order->get_user_id() );
-		$properties['$order_id']                  = (string) $order->get_id();
 		$properties['$user_email']                = $order->get_billing_email();
 		$properties['$verification_phone_number'] = str_starts_with( $order->get_billing_phone(), '+' ) ? preg_replace( '/[^0-9+]/', '', $order->get_billing_phone() ) : null;
 		$properties['$amount']                    = self::get_transaction_micros( floatval( $order->get_total() ) );
 		$properties['$currency_code']             = $order->get_currency();
-		$properties['$billing_address']           = self::get_order_address( (string) $order->get_id(), 'billing' );
-		$properties['$shipping_address']          = self::get_order_address( (string) $order->get_id(), 'shipping' );
+		$properties['$billing_address']           = self::get_order_address( $order, 'billing' );
+		$properties['$shipping_address']          = self::get_order_address( $order, 'shipping' );
 		$properties['$expedited_shipping']        = false;
 		$properties['$items']                     = array();
 
