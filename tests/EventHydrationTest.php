@@ -137,6 +137,7 @@ class EventHydrationTest extends EventTest {
 		$properties = array(
 			'$session_id' => 'test_session_123',
 			'$order_id'   => (string) $order->get_id(),
+			'$user_id'    => $user_id,
 			'$browser'    => array( '$user_agent' => 'Test Agent' ),
 			'$ip'         => '192.168.1.1',
 			'$time'       => 1234567890000,

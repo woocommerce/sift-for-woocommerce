@@ -24,7 +24,8 @@ class GenericEventTest extends \EventTest {
 			return $properties;
 		}, 10, 2 );
 
-		Events::queue_sending_event( $event_type, array( '$user_id' => '12345' ) );
+		$properties = array( '$user_id' => '12345' );
+		Events::queue_sending_event( $event_type, $properties);
 		static::fail_on_error_logged();
 
 		// We see if the event in the stack was modified
@@ -33,10 +34,12 @@ class GenericEventTest extends \EventTest {
 		static::assertEquals( 1, count( $events ), 'No ' . $event_type . ' event found' );
 		$event = reset( $events );
 		static::assertEquals( $event['event'], $event_type, 'Event name not expected.' );
-		static::assertEquals( $event['properties.$user_id'], 'prefix_12345', 'Event param $user_id not expected.' );
-		static::assertEquals( $event['properties.some'], 'data', 'Custom event parameter was not added' );
-
 		static::reset_events();
+
+		$properties = Events::hydrate_event_properties( $event['event'], $properties );
+		$properties = apply_filters( 'sift_for_woocommerce_pre_send_event_properties', $properties, $event['event'] );
+		static::assertEquals( $properties['$user_id'], 'prefix_12345', 'Event param $user_id not expected.' );
+		static::assertEquals( $properties['some'], 'data', 'Custom event parameter was not added' );
 
 		// We check when removing the filter
 		remove_all_filters( 'sift_for_woocommerce_pre_send_event_properties' );
