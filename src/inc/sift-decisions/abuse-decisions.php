@@ -47,6 +47,7 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 			}
 			break;
 
+		case 'likely_fraud_block_keep_purch_payment_abuse':
 		case 'likely_fraud_keep_purchases_payment_abuse':
 			if ( $automated_actions_enabled ) {
 				do_action( 'sift_for_woocommerce_likely_fraud_keep_purchases_payment_abuse', $woocommerce_user_id );
