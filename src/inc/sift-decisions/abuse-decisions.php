@@ -50,8 +50,8 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 		case 'likely_fraud_block_keep_purch_payment_abuse':
 		case 'likely_fraud_keep_purchases_payment_abuse':
 			if ( $automated_actions_enabled ) {
-				do_action( 'sift_for_woocommerce_likely_fraud_keep_purchases_payment_abuse', $woocommerce_user_id );
 				do_action( 'sift_for_woocommerce_send_decision_notification', $woocommerce_user_id, 'making purchases' );
+				do_action( 'sift_for_woocommerce_likely_fraud_keep_purchases_payment_abuse', $woocommerce_user_id );
 			}
 			break;
 
@@ -153,6 +153,9 @@ function process_manual_fraud_decision( string $woocommerce_user_id, string $dec
 			break;
 
 		case 'likely_fraud_keep_purchases_payment_abuse':
+		case 'likely_fraud_block_keep_purch_payment_abuse':
+			// Normalize descision_id
+			$decision_id = 'likely_fraud_block_keep_purch_payment_abuse';
 			do_action( 'sift_for_woocommerce_likely_fraud_keep_purchases_payment_abuse', $woocommerce_user_id );
 			break;
 
@@ -275,8 +278,11 @@ function send_decision_to_sift(
 		$options['description'] = $description;
 	}
 
+	// Translate the user ID to send to Sift if needed.
+	$sift_user_id = apply_filters( 'sift_for_woocommerce_translate_user_id_for_decision', $woocommerce_user_id );
+
 	$response = $client->applyDecisionToUser(
-		$woocommerce_user_id,
+		$sift_user_id,
 		$decision_id,
 		'MANUAL_REVIEW',
 		$options
