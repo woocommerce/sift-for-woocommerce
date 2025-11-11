@@ -19,9 +19,11 @@ function print_sift_tracking_js() {
 		return null;
 	}
 
-	$user_id = null;
+	$sift_user_id = null;
 	if ( is_user_logged_in() ) {
-		$user_id = get_current_user_id();
+		$wccom_user_id = get_current_user_id();
+		// Translate WC user ID to Sift user ID (wpcom or prefixed wccom ID)
+		$sift_user_id = apply_filters( 'sift_for_woocommerce_translate_user_id_for_decision', $wccom_user_id );
 	}
 
 	$session_id = WC()->session->get_customer_unique_id();
@@ -29,7 +31,7 @@ function print_sift_tracking_js() {
 <script type="text/javascript">
 	var _sift = window._sift = window._sift || [];
 	_sift.push([ '_setAccount', '<?php echo esc_js( $beacon_key ); ?>' ]);
-	_sift.push([ '_setUserId',  '<?php echo esc_js( $user_id ); ?>' ]);
+	_sift.push([ '_setUserId',  '<?php echo esc_js( $sift_user_id ); ?>' ]);
 	_sift.push([ '_setSessionId', '<?php echo esc_js( $session_id ); ?>' ]);
 	_sift.push([ '_trackPageview' ]);
 
