@@ -85,6 +85,9 @@ class DisbaledEventTest extends EventTest {
 		$user_id = $this->factory()->user->create();
 		$user    = get_user_by( 'ID', $user_id );
 
+		// - reset events from user creation (wp_set_password is called during user creation)
+		self::reset_events();
+
 		// Act
 		// - update the user
 		$password = wp_generate_password();
