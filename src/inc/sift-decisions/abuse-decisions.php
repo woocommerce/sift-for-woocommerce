@@ -63,7 +63,7 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 
 		case 'trust_list_payment_abuse':
 		case 'not_likely_fraud_payment_abuse':
-		case 'likely_fraud_refundno_renew_payment_abuse':
+		case 'likely_fraud_no_purchases_payment_abuse_1':
 		case 'fraud_payment_abuse':
 		case 'fraud_no_review_ticket_payment_abuse':
 		case 'looks_ok_payment_abuse':
@@ -148,7 +148,7 @@ function process_manual_fraud_decision( string $woocommerce_user_id, string $dec
 			do_action( 'sift_for_woocommerce_not_likely_fraud_payment_abuse', $woocommerce_user_id );
 			break;
 
-		case 'likely_fraud_refundno_renew_payment_abuse':
+		case 'likely_fraud_no_purchases_payment_abuse_1':
 			do_action( 'sift_for_woocommerce_likely_fraud_refundno_renew_payment_abuse', $woocommerce_user_id );
 			break;
 
