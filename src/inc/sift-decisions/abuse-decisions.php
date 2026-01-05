@@ -41,12 +41,6 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 	$automated_actions_enabled = ( 'yes' === get_option( 'wc_sift_for_woocommerce_automated_actions_enabled' ) );
 
 	switch ( $decision_id ) {
-		case 'looks_good_payment_abuse':
-			if ( $automated_actions_enabled ) {
-				do_action( 'sift_for_woocommerce_looks_good_payment_abuse', $woocommerce_user_id );
-			}
-			break;
-
 		case 'likely_fraud_block_keep_purch_payment_abuse':
 		case 'likely_fraud_keep_purchases_payment_abuse':
 			if ( $automated_actions_enabled ) {
@@ -61,6 +55,7 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 			}
 			break;
 
+		case 'looks_good_payment_abuse':
 		case 'trust_list_payment_abuse':
 		case 'not_likely_fraud_payment_abuse':
 		case 'likely_fraud_no_purchases_payment_abuse_1':
@@ -141,7 +136,7 @@ function process_manual_fraud_decision( string $woocommerce_user_id, string $dec
 			break;
 
 		case 'looks_good_payment_abuse':
-			do_action( 'sift_for_woocommerce_looks_good_payment_abuse', $woocommerce_user_id );
+			do_action( 'sift_for_woocommerce_looks_good_payment_abuse', $woocommerce_user_id, false );
 			break;
 
 		case 'not_likely_fraud_payment_abuse':
