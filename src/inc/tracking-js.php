@@ -26,7 +26,15 @@ function print_sift_tracking_js() {
 		$sift_user_id = apply_filters( 'sift_for_woocommerce_translate_user_id_for_decision', $wccom_user_id );
 	}
 
-	$session_id = WC()->session->get_customer_unique_id();
+	$session    = WC()->session ?? null;
+	$session_id = '';
+	if ( $session ) {
+		// Prefer get_customer_unique_id() (standard WC_Session_Handler), fallback to
+		// get_customer_id() for Store API's SessionHandler which doesn't have it.
+		$session_id = method_exists( $session, 'get_customer_unique_id' )
+			? $session->get_customer_unique_id()
+			: (string) $session->get_customer_id();
+	}
 	?>
 <script type="text/javascript">
 	var _sift = window._sift = window._sift || [];

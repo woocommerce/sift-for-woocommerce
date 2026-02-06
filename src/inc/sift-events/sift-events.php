@@ -117,7 +117,7 @@ class Events {
 		$user       = wp_get_current_user();
 		$properties = array(
 			'$user_id'    => self::format_user_id( $user->ID ?? 0 ),
-			'$session_id' => \WC()->session?->get_customer_unique_id() ?? '',
+			'$session_id' => self::get_session_id(),
 			'$promotions' => array(
 				array(
 					'$promotion_id' => $coupon_code,
@@ -149,9 +149,9 @@ class Events {
 		}
 
 		$properties = array(
-			'$user_id'       => self::format_user_id( $user->ID ),
+			'$user_id'       => self::format_user_id( $user->ID ?? 0 ),
 			'$login_status'  => '$success',
-			'$session_id'    => \WC()->session?->get_customer_unique_id() ?? '',
+			'$session_id'    => self::get_session_id(),
 			'$user_email'    => $user->user_email ?? null,
 			'$browser'       => self::get_client_browser(), // alternately, `$app` for details of the app if not a browser.
 			'$username'      => $username,
@@ -203,7 +203,7 @@ class Events {
 		$properties = array(
 			'$user_id'      => self::format_user_id( $user_id ),
 			'$login_status' => '$failure',
-			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
+			'$session_id'   => self::get_session_id(),
 			'$browser'      => self::get_client_browser(), // alternately, `$app` for details of the app if not a browser.
 			'$username'     => $username,
 			'$ip'           => self::get_client_ip(),
@@ -235,8 +235,8 @@ class Events {
 		$user = get_user_by( 'id', $user_id );
 
 		$properties = array(
-			'$user_id'      => self::format_user_id( $user->ID ),
-			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
+			'$user_id'      => self::format_user_id( $user->ID ?? 0 ),
+			'$session_id'   => self::get_session_id(),
 			'$user_email'   => $user->user_email ? $user->user_email : null,
 			// '$referrer_user_id' => ??? -- required for detecting referral fraud, but non-standard to woocommerce.
 			'$browser'      => self::get_client_browser(),
@@ -280,7 +280,7 @@ class Events {
 			'$user_id'      => self::format_user_id( $user->ID ),
 			'$user_email'   => $user->user_email ? $user->user_email : null,
 			// '$referrer_user_id' => ??? -- required for detecting referral fraud, but non-standard to woocommerce.
-			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
+			'$session_id'   => self::get_session_id(),
 			'$browser'      => self::get_client_browser(),
 			'$site_domain'  => wp_parse_url( site_url(), PHP_URL_HOST ),
 			'$site_country' => wc_get_base_location()['country'],
@@ -378,7 +378,7 @@ class Events {
 		$properties = array(
 			'$user_id'      => self::format_user_id( $user->ID ?? 0 ),
 			'$user_email'   => $user->user_email ?? null,
-			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
+			'$session_id'   => self::get_session_id(),
 			'$item'         => array(
 				'$item_id'   => (string) $cart_item_key,
 				'product_id' => $product->get_id(), // Store product ID for later lookup (no $ prefix - internal use)
@@ -424,7 +424,7 @@ class Events {
 		$properties = array(
 			'$user_id'      => self::format_user_id( $user->ID ?? 0 ),
 			'$user_email'   => $user->user_email ? $user->user_email : null,
-			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
+			'$session_id'   => self::get_session_id(),
 			'$item'         => array(
 				'$item_id'   => (string) $product->get_id(),
 				'product_id' => $product->get_id(), // Store product ID for later lookup (no $ - internal use)
@@ -491,7 +491,7 @@ class Events {
 		}
 
 		$properties = array(
-			'$session_id' => WC()->session?->get_customer_unique_id() ?? '',
+			'$session_id' => self::get_session_id(),
 			'$order_id'   => (string) $order->get_id(),
 			'$user_id'    => self::format_user_id( $order->get_user_id() ),
 			'$browser'    => self::get_client_browser(),
@@ -536,7 +536,7 @@ class Events {
 
 		$properties = array(
 			'$user_id'            => self::format_user_id( $order->get_user_id() ),
-			'$session_id'         => \WC()->session?->get_customer_unique_id() ?? '',
+			'$session_id'         => self::get_session_id(),
 			'$amount'             => self::get_transaction_micros( floatval( $order->get_total() ) ), // Gotta multiply it up to give an integer.
 			'$currency_code'      => $order->get_currency(),
 			'$order_id'           => (string) $order->get_id(),
@@ -579,7 +579,7 @@ class Events {
 
 		$properties = array(
 			'$user_id'      => self::format_user_id( $order->get_user_id() ),
-			'$session_id'   => \WC()->session?->get_customer_unique_id() ?? '',
+			'$session_id'   => self::get_session_id(),
 			'$order_id'     => $order_id,
 			'$source'       => $status_transition['manual'] ? '$manual_review' : '$automated',
 			'$description'  => $status_transition['note'],
@@ -996,6 +996,34 @@ class Events {
 		}
 
 		return $client_ip;
+	}
+
+	/**
+	 * Safely get the WooCommerce session ID.
+	 *
+	 * The standard WC_Session_Handler has get_customer_unique_id(), but the
+	 * Store API's SessionHandler (used by WooCommerce Blocks) does not.
+	 * This method safely handles both cases by falling back to get_customer_id()
+	 * which is defined in the abstract WC_Session base class.
+	 *
+	 * @return string The session ID, or empty string if unavailable.
+	 */
+	private static function get_session_id(): string {
+		$session = \WC()->session ?? null;
+
+		if ( null === $session ) {
+			return '';
+		}
+
+		// Prefer get_customer_unique_id() (standard WC_Session_Handler) as it has
+		// additional logic to return user ID when session isn't initialized.
+		if ( method_exists( $session, 'get_customer_unique_id' ) ) {
+			return $session->get_customer_unique_id();
+		}
+
+		// Fallback to get_customer_id() from abstract WC_Session base class.
+		// This works for Store API's SessionHandler and any custom handlers.
+		return (string) $session->get_customer_id();
 	}
 
 	/**
