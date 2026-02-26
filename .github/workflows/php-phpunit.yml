@@ -28,7 +28,7 @@ jobs:
 
       # run composer install
       - name: Composer Install
-        uses: php-actions/composer@v6
+        uses: php-actions/composer@8a65f0d3c6a1d17ca4800491a40b5756a4c164f3 # v6
 
       # get the node version from the .nvmrc file
       - name: Read .nvmrc
@@ -71,7 +71,7 @@ jobs:
           npm run test:coverage
 
       - name: Generate code coverage report
-        uses: irongut/CodeCoverageSummary@v1.3.0
+        uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 # v1.3.0
         with:
           filename: coverage.xml
           badge: true
@@ -81,7 +81,7 @@ jobs:
           format: markdown
 
       - name: Add Coverage PR Comment
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
         if: github.event_name == 'pull_request'
         with:
           recreate: true
