@@ -202,6 +202,11 @@ class Sift_Event_Types {
 	 * @return boolean
 	 */
 	public static function can_event_be_sent( string $event_type ) {
+		// Suppress events when running under WP-CLI (no real user session).
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			return false;
+		}
+
 		$event_disabled_filter = self::get_filter_for_disabled_event_type( $event_type );
 
 		$disabled = apply_filters( $event_disabled_filter, false ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound
