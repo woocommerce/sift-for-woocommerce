@@ -21,6 +21,11 @@ function print_sift_tracking_js() {
 
 	$sift_user_id = null;
 	if ( is_user_logged_in() ) {
+		$should_skip = apply_filters( 'sift_for_woocommerce_should_skip_user', false );
+		if ( $should_skip ) {
+			return null;
+		}
+
 		$wccom_user_id = get_current_user_id();
 		// Translate WC user ID to Sift user ID (wpcom or prefixed wccom ID)
 		$sift_user_id = apply_filters( 'sift_for_woocommerce_translate_user_id_for_decision', $wccom_user_id );

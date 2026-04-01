@@ -683,50 +683,48 @@ class Events {
 	}
 
 	/**
-	 * Get any new abuse decisions for a user, and apply it if needed.
+	 * Extract the most severe payment_abuse decision ID from a Sift track() response
+	 * that was sent with return_workflow_status=true.
 	 *
-	 * @param string $sift_user_id  The user ID sent to Sift, usually the WPCOM user ID.
-	 * @param string $wccom_user_id The WooCommerce user ID.
+	 * Parses the workflow_statuses array in the score_response to collect all decision
+	 * IDs, then returns the most severe one using the filterable severity list.
 	 *
-	 * @return string|null
+	 * @param \SiftResponse $response The response from $client->track().
+	 *
+	 * @return string|null The most severe decision ID, or null if none found.
 	 */
-	public static function get_decision( string $sift_user_id, string $wccom_user_id ): ?string {
-		$client = \Sift_For_WooCommerce\Sift_For_WooCommerce::get_api_client();
-		if ( empty( $client ) ) {
-			Sift_For_WooCommerce::log(
-				'Failed to get the Sift API client.',
-				'error',
-				array(
-					'source' => 'sift-events',
-				)
-			);
+	public static function extract_decision_from_response( \SiftResponse $response ): ?string {
+		$workflow_statuses = $response->body['score_response']['workflow_statuses'] ?? null;
+
+		if ( empty( $workflow_statuses ) || ! is_array( $workflow_statuses ) ) {
+			return null;
+		}
+		// Collect all decision IDs from workflow history entries.
+		$decision_ids = array();
+		foreach ( $workflow_statuses as $status ) {
+			if ( ( $status['history'][0]['app'] ?? '' ) === 'decision'
+				&& isset( $status['history'][0]['config']['decision_id'] )
+			) {
+				$decision_ids[] = $status['history'][0]['config']['decision_id'];
+			}
+		}
+
+		if ( empty( $decision_ids ) ) {
 			return null;
 		}
 
-		// Get the abuse decision from Sift.
-		$user_decisions_response = $client->getUserDecisions( $sift_user_id );
+		// Platform defines severity ordering via filter (most severe first).
+		$severity_order = apply_filters( 'sift_for_woocommerce_decision_ids_by_severity', array() );
 
-		$decision_id = null;
-
-		// If $user_decisions_response->body['decisions'] is empty, log the info.
-		if ( empty( $user_decisions_response->body['decisions'] ) ) {
-			Sift_For_WooCommerce::log(
-				'No decisions found for user',
-				'info',
-				array(
-					'source'       => 'sift-events',
-					'sift_user_id' => $sift_user_id,
-				)
-			);
-			return null;
+		// Return the most severe decision when multiple workflows fire.
+		foreach ( $severity_order as $decision_id ) {
+			if ( in_array( $decision_id, $decision_ids, true ) ) {
+				return $decision_id;
+			}
 		}
 
-		// Extract the decision ID for payment abuse if it exists.
-		if ( isset( $user_decisions_response->body['decisions']['payment_abuse']['decision']['id'] ) ) {
-			$decision_id = $user_decisions_response->body['decisions']['payment_abuse']['decision']['id'];
-		}
-
-		return self::apply_decision( $decision_id, $wccom_user_id );
+		// No recognised decision in severity list - return first found.
+		return $decision_ids[0];
 	}
 
 	/**
@@ -933,8 +931,15 @@ class Events {
 			return false;
 		}
 
-		// Send to Sift API
-		$response = $client->track( $event, $properties );
+		// Only request inline workflow decisions when there's a user ID,
+		// since decisions are per-user.
+		$sift_user_id  = $properties['$user_id'] ?? null;
+		$track_options = array();
+		if ( $sift_user_id ) {
+			$track_options['return_workflow_status'] = true;
+			$track_options['abuse_types']            = array( 'payment_abuse' );
+		}
+		$response = $client->track( $event, $properties, $track_options );
 
 		if ( 200 !== $response->httpStatusCode ) {
 			Sift_For_WooCommerce::log(
@@ -949,14 +954,12 @@ class Events {
 			return false;
 		}
 
-		// Get decisions if user ID is available
-		$sift_user_id = $properties['$user_id'] ?? null;
-
-		// Get the current decision since events have been sent and could have changed the decision.
-		// This is only done if the user ID is set.
+		// Extract and apply inline decision from the track() response if available.
 		if ( $sift_user_id ) {
-			// Get the decision for the user and apply if needed.
-			self::get_decision( $sift_user_id, $sift_user_id );
+			$decision_id = self::extract_decision_from_response( $response );
+			if ( $decision_id ) {
+				self::apply_decision( $decision_id, $sift_user_id );
+			}
 		}
 
 		return true;
