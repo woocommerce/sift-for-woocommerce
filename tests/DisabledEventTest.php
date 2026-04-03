@@ -131,6 +131,35 @@ class DisabledEventTest extends EventTest {
 	}
 
 	/**
+	 * Test that the should_skip_user filter blocks all events.
+	 *
+	 * @return void
+	 */
+	public function test_skip_user_filter() {
+		// Events should send normally.
+		Events::update_password( 'test', '1' );
+		self::fail_on_error_logged();
+		self::assertEventSent( Sift_Event_Types::$update_password );
+
+		self::reset_events();
+
+		// Enable the skip filter.
+		add_filter( 'sift_for_woocommerce_should_skip_user', '__return_true' );
+		Events::update_password( 'test', '1' );
+		self::fail_on_error_logged();
+		self::assertNoEventSent( Sift_Event_Types::$update_password );
+
+		// Remove the skip filter - events should send again.
+		remove_filter( 'sift_for_woocommerce_should_skip_user', '__return_true' );
+
+		self::reset_events();
+
+		Events::update_password( 'test', '1' );
+		self::fail_on_error_logged();
+		self::assertEventSent( Sift_Event_Types::$update_password );
+	}
+
+	/**
 	 * Test that the $or event is triggered.
 	 *
 	 * @return void

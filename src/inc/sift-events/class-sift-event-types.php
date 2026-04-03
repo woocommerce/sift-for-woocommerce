@@ -207,6 +207,11 @@ class Sift_Event_Types {
 			return false;
 		}
 
+		$should_skip_user = apply_filters( 'sift_for_woocommerce_should_skip_user', false );
+		if ( $should_skip_user ) {
+			return false;
+		}
+
 		$event_disabled_filter = self::get_filter_for_disabled_event_type( $event_type );
 
 		$disabled = apply_filters( $event_disabled_filter, false ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound
