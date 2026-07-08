@@ -4,7 +4,9 @@ namespace Sift_For_WooCommerce\Abuse_Decisions;
 
 require_once __DIR__ . '/sift-decision-rest-api-webhooks.php';
 
-const USER_FRAUD_DECISION_META_KEY = 'sfw_fraud_risk_decision';
+const USER_FRAUD_DECISION_META_KEY      = 'sfw_fraud_risk_decision';
+const USER_FRAUD_REVIEW_BYPASS_META_KEY = 'sfw_fraud_review_bypass';
+const USER_FRAUDSTER_FLAG_META_KEY      = 'sfw_fraudster_flag';
 
 /**
  * Process the Sift decision received.
@@ -35,6 +37,37 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 		);
 
 		return $woocommerce_user_id;
+	}
+
+	// Trusted users (bypass flag) are never touched by automated decisions.
+	if ( has_fraud_review_bypass( (int) $woocommerce_user_id ) ) {
+		wc_get_logger()->log(
+			'info',
+			"Automated decision '{$decision_id}' skipped for user {$woocommerce_user_id}: fraud review bypass active",
+			array(
+				'source'              => 'sift-for-woocommerce',
+				'decision_id'         => $decision_id,
+				'sift_user_id'        => $user_id,
+				'woocommerce_user_id' => $woocommerce_user_id,
+			)
+		);
+		return $return_value;
+	}
+
+	// Confirmed fraudster - manually applied, so skip all automation (no re-block, downgrade,
+	// or unblock), same as the bypass flag.
+	if ( has_fraudster_flag( (int) $woocommerce_user_id ) ) {
+		wc_get_logger()->log(
+			'info',
+			"Automated decision '{$decision_id}' skipped for user {$woocommerce_user_id}: fraudster flag active",
+			array(
+				'source'              => 'sift-for-woocommerce',
+				'decision_id'         => $decision_id,
+				'sift_user_id'        => $user_id,
+				'woocommerce_user_id' => $woocommerce_user_id,
+			)
+		);
+		return $return_value;
 	}
 
 	// Checkbox options are "yes" or "no" values
@@ -133,29 +166,41 @@ function process_manual_fraud_decision( string $woocommerce_user_id, string $dec
 	switch ( $decision_id ) {
 		case 'trust_list_payment_abuse':
 			do_action( 'sift_for_woocommerce_trust_list_payment_abuse', $woocommerce_user_id );
+			apply_fraud_review_bypass( (int) $woocommerce_user_id, $analyst );
+			remove_fraudster_flag( (int) $woocommerce_user_id, $analyst );
 			break;
 
 		case 'looks_good_payment_abuse':
 			do_action( 'sift_for_woocommerce_looks_good_payment_abuse', $woocommerce_user_id, false );
+			remove_fraud_review_bypass( (int) $woocommerce_user_id, $analyst );
+			remove_fraudster_flag( (int) $woocommerce_user_id, $analyst );
 			break;
 
 		case 'not_likely_fraud_payment_abuse':
 			do_action( 'sift_for_woocommerce_not_likely_fraud_payment_abuse', $woocommerce_user_id );
+			remove_fraud_review_bypass( (int) $woocommerce_user_id, $analyst );
+			remove_fraudster_flag( (int) $woocommerce_user_id, $analyst );
 			break;
 
 		case 'likely_fraud_no_purchases_payment_abuse_1':
 			do_action( 'sift_for_woocommerce_likely_fraud_refundno_renew_payment_abuse', $woocommerce_user_id );
+			remove_fraud_review_bypass( (int) $woocommerce_user_id, $analyst );
+			remove_fraudster_flag( (int) $woocommerce_user_id, $analyst );
 			break;
 
 		case 'likely_fraud_keep_purchases_payment_abuse':
 		case 'likely_fraud_block_keep_purch_payment_abuse':
-			// Normalize descision_id
+			// Normalize decision_id
 			$decision_id = 'likely_fraud_block_keep_purch_payment_abuse';
 			do_action( 'sift_for_woocommerce_likely_fraud_keep_purchases_payment_abuse', $woocommerce_user_id );
+			remove_fraud_review_bypass( (int) $woocommerce_user_id, $analyst );
+			remove_fraudster_flag( (int) $woocommerce_user_id, $analyst );
 			break;
 
 		case 'fraud_payment_abuse':
 			do_action( 'sift_for_woocommerce_fraud_payment_abuse', $woocommerce_user_id );
+			apply_fraudster_flag( (int) $woocommerce_user_id, $analyst );
+			remove_fraud_review_bypass( (int) $woocommerce_user_id, $analyst );
 			break;
 
 		default:
@@ -253,10 +298,10 @@ function send_decision_to_sift(
 	string $decision_id,
 	string $description,
 	string $analyst
-): \SiftResponse {
+): ?\SiftResponse {
 	$client = \Sift_For_WooCommerce\Sift_For_WooCommerce::get_api_client();
 	if ( empty( $client ) ) {
-		Sift_For_WooCommerce::log(
+		\Sift_For_WooCommerce\Sift_For_WooCommerce::log(
 			'Failed to get the Sift API client.',
 			'error',
 			array(
@@ -298,3 +343,115 @@ function send_decision_to_sift(
 	return $response;
 }
 add_filter( 'sift_for_woocommerce_send_decision_to_sift', __NAMESPACE__ . '\send_decision_to_sift', 10, 4 );
+
+/**
+ * Check if a user has the fraud review bypass flag (trusted user).
+ *
+ * @param integer $user_id WooCommerce user ID.
+ *
+ * @return boolean True if the bypass flag is set.
+ */
+function has_fraud_review_bypass( int $user_id ): bool {
+	return (bool) get_user_meta( $user_id, USER_FRAUD_REVIEW_BYPASS_META_KEY, true );
+}
+
+/**
+ * Set the fraud review bypass flag (mark a user as trusted).
+ *
+ * @param integer $user_id WooCommerce user ID.
+ * @param string  $analyst Username of the analyst making the decision.
+ *
+ * @return void
+ */
+function apply_fraud_review_bypass( int $user_id, string $analyst ): void {
+	update_user_meta( $user_id, USER_FRAUD_REVIEW_BYPASS_META_KEY, true );
+	wc_get_logger()->log(
+		'info',
+		"Fraud review bypass applied for user {$user_id} by {$analyst}",
+		array(
+			'source'              => 'sift-for-woocommerce',
+			'woocommerce_user_id' => $user_id,
+			'by_user_id'          => $analyst,
+		)
+	);
+}
+
+/**
+ * Remove the fraud review bypass flag.
+ *
+ * @param integer $user_id WooCommerce user ID.
+ * @param string  $analyst Username of the analyst making the decision.
+ *
+ * @return void
+ */
+function remove_fraud_review_bypass( int $user_id, string $analyst ): void {
+	// Only log when a flag was actually there, so we don't pollute the audit trail.
+	if ( ! delete_user_meta( $user_id, USER_FRAUD_REVIEW_BYPASS_META_KEY ) ) {
+		return;
+	}
+	wc_get_logger()->log(
+		'info',
+		"Fraud review bypass removed for user {$user_id} by {$analyst}",
+		array(
+			'source'              => 'sift-for-woocommerce',
+			'woocommerce_user_id' => $user_id,
+			'by_user_id'          => $analyst,
+		)
+	);
+}
+
+/**
+ * Check if a user has the fraudster flag (confirmed fraud).
+ *
+ * @param integer $user_id WooCommerce user ID.
+ *
+ * @return boolean True if the fraudster flag is set.
+ */
+function has_fraudster_flag( int $user_id ): bool {
+	return (bool) get_user_meta( $user_id, USER_FRAUDSTER_FLAG_META_KEY, true );
+}
+
+/**
+ * Set the fraudster flag (mark a user as confirmed fraud).
+ *
+ * @param integer $user_id WooCommerce user ID.
+ * @param string  $analyst Username of the analyst making the decision.
+ *
+ * @return void
+ */
+function apply_fraudster_flag( int $user_id, string $analyst ): void {
+	update_user_meta( $user_id, USER_FRAUDSTER_FLAG_META_KEY, true );
+	wc_get_logger()->log(
+		'info',
+		"Fraudster flag applied for user {$user_id} by {$analyst}",
+		array(
+			'source'              => 'sift-for-woocommerce',
+			'woocommerce_user_id' => $user_id,
+			'by_user_id'          => $analyst,
+		)
+	);
+}
+
+/**
+ * Remove the fraudster flag.
+ *
+ * @param integer $user_id WooCommerce user ID.
+ * @param string  $analyst Username of the analyst making the decision.
+ *
+ * @return void
+ */
+function remove_fraudster_flag( int $user_id, string $analyst ): void {
+	// Only log when a flag was actually there, so we don't pollute the audit trail.
+	if ( ! delete_user_meta( $user_id, USER_FRAUDSTER_FLAG_META_KEY ) ) {
+		return;
+	}
+	wc_get_logger()->log(
+		'info',
+		"Fraudster flag removed for user {$user_id} by {$analyst}",
+		array(
+			'source'              => 'sift-for-woocommerce',
+			'woocommerce_user_id' => $user_id,
+			'by_user_id'          => $analyst,
+		)
+	);
+}
