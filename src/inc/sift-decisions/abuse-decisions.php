@@ -8,6 +8,9 @@ const USER_FRAUD_DECISION_META_KEY      = 'sfw_fraud_risk_decision';
 const USER_FRAUD_REVIEW_BYPASS_META_KEY = 'sfw_fraud_review_bypass';
 const USER_FRAUDSTER_FLAG_META_KEY      = 'sfw_fraudster_flag';
 
+const FRAUD_DECISION_SOURCE_MANUAL    = 'fraud-decision-manual';
+const FRAUD_DECISION_SOURCE_AUTOMATED = 'fraud-decision-automated';
+
 /**
  * Process the Sift decision received.
  *
@@ -125,6 +128,8 @@ function process_sift_decision_received( $return_value, $decision_id, $user_id )
 	);
 
 	if ( $automated_actions_enabled ) {
+		record_fraud_decision( (int) $woocommerce_user_id, $decision_id, '', FRAUD_DECISION_SOURCE_AUTOMATED );
+
 		// Store the last fraud decision applied to the user.
 		apply_filters(
 			'sift_for_woocommerce_save_last_fraud_decision',
@@ -238,6 +243,8 @@ function process_manual_fraud_decision( string $woocommerce_user_id, string $dec
 		)
 	);
 
+	record_fraud_decision( (int) $woocommerce_user_id, $decision_id, $analyst, FRAUD_DECISION_SOURCE_MANUAL );
+
 	/**
 	 * Store the last fraud decision for a user.
 	 */
@@ -267,6 +274,56 @@ function get_last_fraud_decision( int $woocommerce_user_id ): string {
 }
 add_filter( 'sift_for_woocommerce_get_last_fraud_decision', __NAMESPACE__ . '\get_last_fraud_decision', 10, 1 );
 
+/**
+ * Log a fraud decision to history and fire an action for consumers (the wccom sidecar).
+ *
+ * Both decision paths call this just before saving the new decision, while the previous one
+ * is still readable. Does nothing if the decision hasn't changed, so re-applying the same
+ * decision doesn't add a duplicate history row.
+ *
+ * @param integer $woocommerce_user_id ID of the WooCommerce user the decision applies to.
+ * @param string  $decision_id         The decision ID being applied.
+ * @param string  $analyst             Username of the fraud analyst, empty for automated decisions.
+ * @param string  $source              One of the FRAUD_DECISION_SOURCE_* constants.
+ *
+ * @return void
+ */
+function record_fraud_decision( int $woocommerce_user_id, string $decision_id, string $analyst, string $source ): void {
+	$previous_decision_id = get_last_fraud_decision( $woocommerce_user_id );
+	if ( $previous_decision_id === $decision_id ) {
+		return;
+	}
+
+	// This runs before the decision is saved, so recording history must never throw and skip the save.
+	try {
+		wc_get_logger()->log(
+			'info',
+			"Fraud decision '{$decision_id}' recorded for user {$woocommerce_user_id}",
+			array(
+				'source'               => 'sift-for-woocommerce',
+				'decision_id'          => $decision_id,
+				'previous_decision_id' => $previous_decision_id,
+				'woocommerce_user_id'  => $woocommerce_user_id,
+				'analyst'              => $analyst,
+				'decision_source'      => $source,
+			)
+		);
+
+		do_action(
+			'sift_for_woocommerce_fraud_decision_applied',
+			$woocommerce_user_id,
+			$decision_id,
+			$previous_decision_id,
+			$analyst,
+			$source
+		);
+	} catch ( \Throwable $e ) {
+		wc_get_logger()->warning(
+			"Fraud decision history not recorded for user {$woocommerce_user_id}: " . $e->getMessage(),
+			array( 'source' => 'sift-for-woocommerce' )
+		);
+	}
+}
 
 /**
  * Save the last fraud decision made for a user.
