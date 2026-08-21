@@ -185,13 +185,14 @@ class Sift_For_WooCommerce {
 	 *
 	 * This provides a public API for other plugins to check if a user
 	 * has been flagged for fraud. The actual implementation is provided
-	 * via the filter hook.
+	 * via the filter hook, which takes the current block status first
+	 * and the user ID second.
 	 *
 	 * @param integer $user_id The user ID to check.
 	 *
 	 * @return boolean Returns true if blocked, false otherwise.
 	 */
 	public static function has_new_purchase_block( $user_id ): bool {
-		return apply_filters( 'sift_for_woocommerce_has_new_purchase_block', $user_id, false );
+		return apply_filters( 'sift_for_woocommerce_has_new_purchase_block', false, $user_id );
 	}
 }
