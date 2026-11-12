@@ -1,0 +1,267 @@
+name: Test the build
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  # The name the plugin would be registered under in the Jetpack Beta Builder. Jetpack Beta installs
+  # a dev build as "<slug>-dev", which is why the build below uses that folder name.
+  BETA_PLUGIN_SLUG: sift-for-woocommerce
+
+jobs:
+  build-and-comment:
+    name: Build the plugin and comment on the PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # 2.37.1
+        with:
+          php-version: '8.2'
+          tools: composer
+
+      # The version tells a tester which pull request and commit a site is running.
+      - name: Set the dev version
+        id: dev-version
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          VERSION=$( jq -r '.version' package.json )
+          IFS=. read -r MAJOR MINOR PATCH <<<"$VERSION"
+          # A pre-release suffix such as "-beta.1" is dropped before the patch number is raised.
+          DEV_VERSION="${MAJOR}.${MINOR}.$(( ${PATCH%%[!0-9]*} + 1 ))-dev_PR-${PR_NUMBER}_commit-${PR_HEAD_SHA:0:7}"
+
+          sed -i "s/^\( \* Version: *\).*$/\1${DEV_VERSION}/" sift-for-woocommerce.php
+          grep -q "^ \* Version: *${DEV_VERSION}$" sift-for-woocommerce.php
+
+          echo "Dev version: ${DEV_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "version=${DEV_VERSION}" >> "$GITHUB_OUTPUT"
+
+      # The plugin does not load without vendor/autoload.php.
+      - name: Install the production dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      # The repository has no release build to reuse, so the zip is put together here: the checkout
+      # with vendor/, without the files that are only for development. The dev build gets its own
+      # folder name, so Jetpack Beta can install it next to the released plugin.
+      - name: Build the plugin zip
+        run: |
+          mkdir -p "release/${BETA_PLUGIN_SLUG}-dev"
+          rsync -a \
+            --exclude='/.*' \
+            --exclude='/release' \
+            --exclude='/bin' \
+            --exclude='/tests' \
+            --exclude='/node_modules' \
+            --exclude='/composer.json' \
+            --exclude='/composer.lock' \
+            --exclude='/package.json' \
+            --exclude='/package-lock.json' \
+            --exclude='/phpunit.xml.dist' \
+            --exclude='/postcss.config.js' \
+            --exclude='/AGENTS.md' \
+            --exclude='/DEVELOPMENT.md' \
+            ./ "release/${BETA_PLUGIN_SLUG}-dev/"
+
+          test -f "release/${BETA_PLUGIN_SLUG}-dev/vendor/autoload.php"
+
+          cd release
+          zip -q -r "${BETA_PLUGIN_SLUG}-dev.zip" "${BETA_PLUGIN_SLUG}-dev"
+          rm -r "${BETA_PLUGIN_SLUG}-dev"
+
+      # The Playground link downloads this artifact on every click, so it is kept for longer than the
+      # Jetpack Beta Builder one. The run ID in the name ties the link to the files of one run. The
+      # setup file travels with the build because it is not part of the plugin zip.
+      - name: Collect the files for the Playground preview
+        run: |
+          mkdir playground-preview
+          cp "release/${BETA_PLUGIN_SLUG}-dev.zip" playground-preview/
+          cp bin/playground/setup.php playground-preview/setup.php
+
+      - name: Upload the files for the Playground preview as an artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playground-preview-${{ github.run_id }}
+          path: playground-preview
+          if-no-files-found: error
+          retention-days: 14
+
+      # Pull requests from forks and from Dependabot do not receive the secret.
+      - name: Check for the Jetpack Beta Builder secret
+        id: beta-builder-secret
+        env:
+          SECRET: ${{ secrets.SIFT_LIVE_BRANCH_SECRET }}
+        run: |
+          if [ -n "$SECRET" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo ":information_source: No Jetpack Beta Builder secret in this run, so the comment marks the Jetpack Beta and Jurassic Ninja options as not available." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the zip file as an artifact for the Jetpack Beta Builder
+        if: steps.beta-builder-secret.outputs.available == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: plugins # The name the Jetpack Beta Builder looks for.
+          path: release
+          if-no-files-found: error
+          # The Jetpack Beta Builder copies it right away.
+          retention-days: 1
+
+      # A build the Jetpack Beta Builder refuses must not fail the job: the Playground preview does
+      # not depend on it. The comment then marks the first two options as not available.
+      - name: Inform the Jetpack Beta Builder webhook
+        id: beta-builder
+        if: steps.beta-builder-secret.outputs.available == 'true'
+        env:
+          SECRET: ${{ secrets.SIFT_LIVE_BRANCH_SECRET }}
+          DEV_VERSION: ${{ steps.dev-version.outputs.version }}
+          PR_NUMBER: ${{ github.event.number }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          PLUGIN_DATA=$( jq -cn --arg slug "$BETA_PLUGIN_SLUG" --arg version "$DEV_VERSION" '{ ($slug): { version: $version } }' )
+
+          # GITHUB_REF is "refs/pull/<number>/merge" here, and builds are looked up by branch name.
+          if curl --fail --silent --show-error -L \
+            --url "https://betadownload.jetpack.me/gh-action.php?run_id=${GITHUB_RUN_ID}&pr=${PR_NUMBER}&commit=${GITHUB_SHA}" \
+            --form-string "repo=${GITHUB_REPOSITORY}" \
+            --form-string "branch=${PR_HEAD_REF}" \
+            --form-string "plugins=${PLUGIN_DATA}" \
+            --form-string "secret=${SECRET}"; then
+            echo "informed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "informed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::The Jetpack Beta Builder did not accept this build, so the comment marks the Jetpack Beta and Jurassic Ninja options as not available."
+          fi
+
+      # WordPress Playground runs in the visitor's browser and can only fetch public URLs. Its artifact
+      # proxy serves this workflow's artifacts for the pull request and finds the workflow by name, hence
+      # GITHUB_WORKFLOW rather than a literal that a rename would silently break.
+      #
+      # The proxy picks the build by branch name, so the link can end up serving the build of a fork
+      # whose branch has the same name. That is why the Blueprint holds no Sift keys and the comment
+      # tells the visitor not to enter any.
+      - name: Build the WordPress Playground preview link
+        id: playground
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          ARTIFACT_URL=$( jq -rn \
+            --arg org "$GITHUB_REPOSITORY_OWNER" \
+            --arg repo "${GITHUB_REPOSITORY#*/}" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg pr "$PR_NUMBER" \
+            --arg artifact "playground-preview-${GITHUB_RUN_ID}" \
+            '"https://playground.wordpress.net/plugin-proxy.php?org=\($org|@uri)&repo=\($repo|@uri)&workflow=\($workflow|@uri)&pr=\($pr|@uri)&artifact=\($artifact|@uri)"' )
+
+          BLUEPRINT=$( jq -cn --arg artifact_url "$ARTIFACT_URL" --arg zip "${BETA_PLUGIN_SLUG}-dev.zip" '
+            {
+              "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+              landingPage: "/wp-admin/admin.php?page=wc-settings&tab=sift_for_woocommerce",
+              preferredVersions: { php: "8.3", wp: "latest" },
+              features: { networking: true },
+              steps: [
+                { step: "login", username: "admin" },
+                { step: "installPlugin", pluginData: { resource: "wordpress.org/plugins", slug: "woocommerce" }, options: { activate: true } },
+                { step: "unzip", zipFile: { resource: "url", url: $artifact_url, caption: "Downloading the Sift for WooCommerce build for this PR" }, extractToPath: "/tmp/pr" },
+                { step: "installPlugin", pluginData: { resource: "vfs", path: ( "/tmp/pr/" + $zip ) }, options: { activate: true } },
+                { step: "runPHP", code: "<?php require \"/tmp/pr/setup.php\";" }
+              ]
+            }' )
+
+          echo "url=https://playground.wordpress.net/#$( jq -rn --argjson blueprint "$BLUEPRINT" '$blueprint|tojson|@uri' )" >> "$GITHUB_OUTPUT"
+
+      - name: Write the comment
+        env:
+          BETA_BUILDER_INFORMED: ${{ steps.beta-builder.outputs.informed }}
+          PLAYGROUND_URL: ${{ steps.playground.outputs.url }}
+          PR_NUMBER: ${{ github.event.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.head_ref }}
+        run: |
+          {
+            echo "### Test the build"
+            echo
+
+            # A link that cannot work is worse than no link, so without a build on the Jetpack Beta
+            # Builder the first two options say what they need instead.
+            if [ "$BETA_BUILDER_INFORMED" = "true" ]; then
+              cat <<EOF
+          #### Option 1. Jetpack Beta
+
+          - Install and activate [Jetpack Beta](https://jetpack.com/beta/#download-and-install).
+          - Use this build by searching for PR number \`${PR_NUMBER}\` or branch name \`${PR_HEAD_REF}\` in your-test.site/wp-admin/admin.php?page=jetpack-beta&plugin=${BETA_PLUGIN_SLUG}
+
+          :information_source: The plugin does nothing until you save the keys of a Sift account of your own (use a sandbox account) and switch on the events to send, under WooCommerce > Settings > Sift for WooCommerce. Sift's decision webhooks only arrive on a site with a public HTTPS address.
+
+          #### Option 2. Jurassic Ninja - available for logged-in A12s
+
+          :warning: Log in at [jurassic.ninja](https://jurassic.ninja/) first. Without a login, the link below takes you to the Jurassic Ninja homepage and no site is created.
+
+          :rocket: [Launch a JN site with this branch and sample products](https://jurassic.ninja/create/?jetpack-beta&nojetpack&woocommerce&woocommerce-import-sample-data&branches.${BETA_PLUGIN_SLUG}=${PR_HEAD_REF}) :rocket:
+
+          :information_source: The new site has a public HTTPS address, which Sift's decision webhooks need. It still needs the keys of a Sift account of your own, and the events switched on.
+
+          EOF
+            else
+              cat <<EOF
+          #### Option 1. Jetpack Beta
+
+          :construction: Not available for this build. Jetpack Beta only offers builds that were sent to the Jetpack Beta Builder, and this one was not: the plugin has to be registered there, and the run needs the \`SIFT_LIVE_BRANCH_SECRET\` secret, which pull requests from forks and from Dependabot never receive.
+
+          #### Option 2. Jurassic Ninja - available for logged-in A12s
+
+          :construction: Not available for this build. Jurassic Ninja installs a branch through Jetpack Beta, so it needs what Option 1 needs.
+
+          EOF
+            fi
+
+            cat <<EOF
+          #### Option 3. WordPress Playground - runs in your browser
+
+          :shield: [Open a store with this build](${PLAYGROUND_URL}): a fresh store on the Sift for WooCommerce settings screen, logged in as an administrator. It has one product, cash on delivery, and every event the settings screen offers switched on.
+
+          :information_source: The store has no Sift keys, so it sends nothing to Sift and gets no decisions back. Events stop in the queue: add the product to the cart or place an order, then search for \`sift\` under WooCommerce > Status > Scheduled Actions > Pending. "Run" on an event builds its full payload and writes it, as a failed send, to the \`sift-for-woocommerce\` log under WooCommerce > Status > Logs. Sift's decision webhooks cannot reach a site that runs in your browser. Stripe, WooPayments and PayPal are not installed, so order events carry no payment method details. Do not enter real Sift keys in a preview. The link stops working 14 days after the last build.
+
+          ---
+
+          Build info:
+
+          - Latest commit: ${PR_HEAD_SHA}
+          - Build time: $( date -u "+%Y-%m-%d %H:%M:%S UTC" )
+
+          _Note: the build is updated when a new commit is pushed to this PR._
+          EOF
+          } > "$RUNNER_TEMP/test-the-build.md"
+
+          cat "$RUNNER_TEMP/test-the-build.md" >> "$GITHUB_STEP_SUMMARY"
+
+      # The token of a pull request from a fork cannot write comments; the job summary has the same text.
+      - name: Add or update the comment in the PR
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          COMMENT_IDS=$( gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq '.[] | select( .user.login == "github-actions[bot]" and ( .body | startswith( "### Test the build" ) ) ) | .id' )
+          COMMENT_ID=$( head -n 1 <<<"$COMMENT_IDS" )
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" -X PATCH -F "body=@${RUNNER_TEMP}/test-the-build.md" --silent
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -F "body=@${RUNNER_TEMP}/test-the-build.md" --silent
+          fi
