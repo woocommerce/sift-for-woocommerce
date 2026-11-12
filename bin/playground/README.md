@@ -1,6 +1,6 @@
 # WordPress Playground preview
 
-Every pull request gets a "Test the build" comment. Its third option is a [WordPress Playground](https://wordpress.org/playground/) link, which runs WordPress in the visitor's browser with the build of that pull request, so a reviewer needs no site of their own.
+Every pull request gets a "Test the build" comment with a [WordPress Playground](https://wordpress.org/playground/) link, which runs WordPress in the visitor's browser with the build of that pull request, so a reviewer needs no site of their own.
 
 The link is built in `.github/workflows/pr-build-live-branch.yml`. It is a Blueprint that installs WooCommerce, downloads one workflow artifact holding the plugin zip and `setup.php` from this directory, installs the zip and runs `setup.php`.
 

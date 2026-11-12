@@ -12,9 +12,7 @@ permissions:
   pull-requests: write
 
 env:
-  # The name the plugin would be registered under in the Jetpack Beta Builder. Jetpack Beta installs
-  # a dev build as "<slug>-dev", which is why the build below uses that folder name.
-  BETA_PLUGIN_SLUG: sift-for-woocommerce
+  PLUGIN_SLUG: sift-for-woocommerce
 
 jobs:
   build-and-comment:
@@ -54,11 +52,10 @@ jobs:
         run: composer install --no-dev --optimize-autoloader --no-interaction
 
       # The repository has no release build to reuse, so the zip is put together here: the checkout
-      # with vendor/, without the files that are only for development. The dev build gets its own
-      # folder name, so Jetpack Beta can install it next to the released plugin.
+      # with vendor/, without the files that are only for development.
       - name: Build the plugin zip
         run: |
-          mkdir -p "release/${BETA_PLUGIN_SLUG}-dev"
+          mkdir -p "release/${PLUGIN_SLUG}"
           rsync -a \
             --exclude='/.*' \
             --exclude='/release' \
@@ -73,21 +70,21 @@ jobs:
             --exclude='/postcss.config.js' \
             --exclude='/AGENTS.md' \
             --exclude='/DEVELOPMENT.md' \
-            ./ "release/${BETA_PLUGIN_SLUG}-dev/"
+            ./ "release/${PLUGIN_SLUG}/"
 
-          test -f "release/${BETA_PLUGIN_SLUG}-dev/vendor/autoload.php"
+          test -f "release/${PLUGIN_SLUG}/vendor/autoload.php"
 
           cd release
-          zip -q -r "${BETA_PLUGIN_SLUG}-dev.zip" "${BETA_PLUGIN_SLUG}-dev"
-          rm -r "${BETA_PLUGIN_SLUG}-dev"
+          zip -q -r "${PLUGIN_SLUG}.zip" "${PLUGIN_SLUG}"
+          rm -r "${PLUGIN_SLUG}"
 
-      # The Playground link downloads this artifact on every click, so it is kept for longer than the
-      # Jetpack Beta Builder one. The run ID in the name ties the link to the files of one run. The
-      # setup file travels with the build because it is not part of the plugin zip.
+      # The Playground link downloads this artifact on every click, so it is kept for 14 days. The run
+      # ID in the name ties the link to the files of one run. The setup file travels with the build
+      # because it is not part of the plugin zip.
       - name: Collect the files for the Playground preview
         run: |
           mkdir playground-preview
-          cp "release/${BETA_PLUGIN_SLUG}-dev.zip" playground-preview/
+          cp "release/${PLUGIN_SLUG}.zip" playground-preview/
           cp bin/playground/setup.php playground-preview/setup.php
 
       - name: Upload the files for the Playground preview as an artifact
@@ -97,55 +94,6 @@ jobs:
           path: playground-preview
           if-no-files-found: error
           retention-days: 14
-
-      # Pull requests from forks and from Dependabot do not receive the secret.
-      - name: Check for the Jetpack Beta Builder secret
-        id: beta-builder-secret
-        env:
-          SECRET: ${{ secrets.SIFT_LIVE_BRANCH_SECRET }}
-        run: |
-          if [ -n "$SECRET" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo ":information_source: No Jetpack Beta Builder secret in this run, so the comment marks the Jetpack Beta and Jurassic Ninja options as not available." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Upload the zip file as an artifact for the Jetpack Beta Builder
-        if: steps.beta-builder-secret.outputs.available == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: plugins # The name the Jetpack Beta Builder looks for.
-          path: release
-          if-no-files-found: error
-          # The Jetpack Beta Builder copies it right away.
-          retention-days: 1
-
-      # A build the Jetpack Beta Builder refuses must not fail the job: the Playground preview does
-      # not depend on it. The comment then marks the first two options as not available.
-      - name: Inform the Jetpack Beta Builder webhook
-        id: beta-builder
-        if: steps.beta-builder-secret.outputs.available == 'true'
-        env:
-          SECRET: ${{ secrets.SIFT_LIVE_BRANCH_SECRET }}
-          DEV_VERSION: ${{ steps.dev-version.outputs.version }}
-          PR_NUMBER: ${{ github.event.number }}
-          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          PLUGIN_DATA=$( jq -cn --arg slug "$BETA_PLUGIN_SLUG" --arg version "$DEV_VERSION" '{ ($slug): { version: $version } }' )
-
-          # GITHUB_REF is "refs/pull/<number>/merge" here, and builds are looked up by branch name.
-          if curl --fail --silent --show-error -L \
-            --url "https://betadownload.jetpack.me/gh-action.php?run_id=${GITHUB_RUN_ID}&pr=${PR_NUMBER}&commit=${GITHUB_SHA}" \
-            --form-string "repo=${GITHUB_REPOSITORY}" \
-            --form-string "branch=${PR_HEAD_REF}" \
-            --form-string "plugins=${PLUGIN_DATA}" \
-            --form-string "secret=${SECRET}"; then
-            echo "informed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "informed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::The Jetpack Beta Builder did not accept this build, so the comment marks the Jetpack Beta and Jurassic Ninja options as not available."
-          fi
 
       # WordPress Playground runs in the visitor's browser and can only fetch public URLs. Its artifact
       # proxy serves this workflow's artifacts for the pull request and finds the workflow by name, hence
@@ -167,7 +115,7 @@ jobs:
             --arg artifact "playground-preview-${GITHUB_RUN_ID}" \
             '"https://playground.wordpress.net/plugin-proxy.php?org=\($org|@uri)&repo=\($repo|@uri)&workflow=\($workflow|@uri)&pr=\($pr|@uri)&artifact=\($artifact|@uri)"' )
 
-          BLUEPRINT=$( jq -cn --arg artifact_url "$ARTIFACT_URL" --arg zip "${BETA_PLUGIN_SLUG}-dev.zip" '
+          BLUEPRINT=$( jq -cn --arg artifact_url "$ARTIFACT_URL" --arg zip "${PLUGIN_SLUG}.zip" '
             {
               "$schema": "https://playground.wordpress.net/blueprint-schema.json",
               landingPage: "/wp-admin/admin.php?page=wc-settings&tab=sift_for_woocommerce",
@@ -186,51 +134,13 @@ jobs:
 
       - name: Write the comment
         env:
-          BETA_BUILDER_INFORMED: ${{ steps.beta-builder.outputs.informed }}
           PLAYGROUND_URL: ${{ steps.playground.outputs.url }}
-          PR_NUMBER: ${{ github.event.number }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_HEAD_REF: ${{ github.head_ref }}
         run: |
-          {
-            echo "### Test the build"
-            echo
+          cat > "$RUNNER_TEMP/test-the-build.md" <<EOF
+          ### Test the build
 
-            # A link that cannot work is worse than no link, so without a build on the Jetpack Beta
-            # Builder the first two options say what they need instead.
-            if [ "$BETA_BUILDER_INFORMED" = "true" ]; then
-              cat <<EOF
-          #### Option 1. Jetpack Beta
-
-          - Install and activate [Jetpack Beta](https://jetpack.com/beta/#download-and-install).
-          - Use this build by searching for PR number \`${PR_NUMBER}\` or branch name \`${PR_HEAD_REF}\` in your-test.site/wp-admin/admin.php?page=jetpack-beta&plugin=${BETA_PLUGIN_SLUG}
-
-          :information_source: The plugin does nothing until you save the keys of a Sift account of your own (use a sandbox account) and switch on the events to send, under WooCommerce > Settings > Sift for WooCommerce. Sift's decision webhooks only arrive on a site with a public HTTPS address.
-
-          #### Option 2. Jurassic Ninja - available for logged-in A12s
-
-          :warning: Log in at [jurassic.ninja](https://jurassic.ninja/) first. Without a login, the link below takes you to the Jurassic Ninja homepage and no site is created.
-
-          :rocket: [Launch a JN site with this branch and sample products](https://jurassic.ninja/create/?jetpack-beta&nojetpack&woocommerce&woocommerce-import-sample-data&branches.${BETA_PLUGIN_SLUG}=${PR_HEAD_REF}) :rocket:
-
-          :information_source: The new site has a public HTTPS address, which Sift's decision webhooks need. It still needs the keys of a Sift account of your own, and the events switched on.
-
-          EOF
-            else
-              cat <<EOF
-          #### Option 1. Jetpack Beta
-
-          :construction: Not available for this build. Jetpack Beta only offers builds that were sent to the Jetpack Beta Builder, and this one was not: the plugin has to be registered there, and the run needs the \`SIFT_LIVE_BRANCH_SECRET\` secret, which pull requests from forks and from Dependabot never receive.
-
-          #### Option 2. Jurassic Ninja - available for logged-in A12s
-
-          :construction: Not available for this build. Jurassic Ninja installs a branch through Jetpack Beta, so it needs what Option 1 needs.
-
-          EOF
-            fi
-
-            cat <<EOF
-          #### Option 3. WordPress Playground - runs in your browser
+          #### WordPress Playground - runs in your browser
 
           :shield: [Open a store with this build](${PLAYGROUND_URL}): a fresh store on the Sift for WooCommerce settings screen, logged in as an administrator. It has one product, cash on delivery, and every event the settings screen offers switched on.
 
@@ -245,7 +155,6 @@ jobs:
 
           _Note: the build is updated when a new commit is pushed to this PR._
           EOF
-          } > "$RUNNER_TEMP/test-the-build.md"
 
           cat "$RUNNER_TEMP/test-the-build.md" >> "$GITHUB_STEP_SUMMARY"
 
