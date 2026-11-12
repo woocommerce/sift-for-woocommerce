@@ -22,8 +22,11 @@ sift-for-woocommerce/
 │       ├── rest-api.php          # Custom REST endpoints (HMAC auth)
 │       └── wc-admin-settings-tab.php
 ├── tests/                        # PHPUnit tests
-└── bin/test-payment-gateway/     # Test gateway plugin (auto-approves all)
+├── bin/test-payment-gateway/     # Test gateway plugin (auto-approves all)
+└── bin/playground/               # Store setup for the WordPress Playground preview of a PR
 ```
+
+Every PR gets a "Test the build" comment from `.github/workflows/pr-build-live-branch.yml`. The workflow builds the plugin zip, and its WordPress Playground link runs `bin/playground/setup.php`. The Blueprint and that file MUST NOT contain or ask for Sift keys; see `bin/playground/README.md`.
 
 ### Key Concepts
 

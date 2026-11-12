@@ -1,0 +1,176 @@
+name: Test the build
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  PLUGIN_SLUG: sift-for-woocommerce
+
+jobs:
+  build-and-comment:
+    name: Build the plugin and comment on the PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # 2.37.1
+        with:
+          php-version: '8.2'
+          tools: composer
+
+      # The version tells a tester which pull request and commit a site is running.
+      - name: Set the dev version
+        id: dev-version
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          VERSION=$( jq -r '.version' package.json )
+          IFS=. read -r MAJOR MINOR PATCH <<<"$VERSION"
+          # A pre-release suffix such as "-beta.1" is dropped before the patch number is raised.
+          DEV_VERSION="${MAJOR}.${MINOR}.$(( ${PATCH%%[!0-9]*} + 1 ))-dev_PR-${PR_NUMBER}_commit-${PR_HEAD_SHA:0:7}"
+
+          sed -i "s/^\( \* Version: *\).*$/\1${DEV_VERSION}/" sift-for-woocommerce.php
+          grep -q "^ \* Version: *${DEV_VERSION}$" sift-for-woocommerce.php
+
+          echo "Dev version: ${DEV_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "version=${DEV_VERSION}" >> "$GITHUB_OUTPUT"
+
+      # The plugin does not load without vendor/autoload.php.
+      - name: Install the production dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      # The repository has no release build to reuse, so the zip is put together here: the checkout
+      # with vendor/, without the files that are only for development.
+      - name: Build the plugin zip
+        run: |
+          mkdir -p "release/${PLUGIN_SLUG}"
+          rsync -a \
+            --exclude='/.*' \
+            --exclude='/release' \
+            --exclude='/bin' \
+            --exclude='/tests' \
+            --exclude='/node_modules' \
+            --exclude='/composer.json' \
+            --exclude='/composer.lock' \
+            --exclude='/package.json' \
+            --exclude='/package-lock.json' \
+            --exclude='/phpunit.xml.dist' \
+            --exclude='/postcss.config.js' \
+            --exclude='/AGENTS.md' \
+            --exclude='/DEVELOPMENT.md' \
+            ./ "release/${PLUGIN_SLUG}/"
+
+          test -f "release/${PLUGIN_SLUG}/vendor/autoload.php"
+
+          cd release
+          zip -q -r "${PLUGIN_SLUG}.zip" "${PLUGIN_SLUG}"
+          rm -r "${PLUGIN_SLUG}"
+
+      # The Playground link downloads this artifact on every click, so it is kept for 14 days. The run
+      # ID in the name ties the link to the files of one run. The setup file travels with the build
+      # because it is not part of the plugin zip.
+      - name: Collect the files for the Playground preview
+        run: |
+          mkdir playground-preview
+          cp "release/${PLUGIN_SLUG}.zip" playground-preview/
+          cp bin/playground/setup.php playground-preview/setup.php
+
+      - name: Upload the files for the Playground preview as an artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playground-preview-${{ github.run_id }}
+          path: playground-preview
+          if-no-files-found: error
+          retention-days: 14
+
+      # WordPress Playground runs in the visitor's browser and can only fetch public URLs. Its artifact
+      # proxy serves this workflow's artifacts for the pull request and finds the workflow by name, hence
+      # GITHUB_WORKFLOW rather than a literal that a rename would silently break.
+      #
+      # The proxy picks the build by branch name, so the link can end up serving the build of a fork
+      # whose branch has the same name. That is why the Blueprint holds no Sift keys and the comment
+      # tells the visitor not to enter any.
+      - name: Build the WordPress Playground preview link
+        id: playground
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          ARTIFACT_URL=$( jq -rn \
+            --arg org "$GITHUB_REPOSITORY_OWNER" \
+            --arg repo "${GITHUB_REPOSITORY#*/}" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg pr "$PR_NUMBER" \
+            --arg artifact "playground-preview-${GITHUB_RUN_ID}" \
+            '"https://playground.wordpress.net/plugin-proxy.php?org=\($org|@uri)&repo=\($repo|@uri)&workflow=\($workflow|@uri)&pr=\($pr|@uri)&artifact=\($artifact|@uri)"' )
+
+          BLUEPRINT=$( jq -cn --arg artifact_url "$ARTIFACT_URL" --arg zip "${PLUGIN_SLUG}.zip" '
+            {
+              "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+              landingPage: "/wp-admin/admin.php?page=wc-settings&tab=sift_for_woocommerce",
+              preferredVersions: { php: "8.3", wp: "latest" },
+              features: { networking: true },
+              steps: [
+                { step: "login", username: "admin" },
+                { step: "installPlugin", pluginData: { resource: "wordpress.org/plugins", slug: "woocommerce" }, options: { activate: true } },
+                { step: "unzip", zipFile: { resource: "url", url: $artifact_url, caption: "Downloading the Sift for WooCommerce build for this PR" }, extractToPath: "/tmp/pr" },
+                { step: "installPlugin", pluginData: { resource: "vfs", path: ( "/tmp/pr/" + $zip ) }, options: { activate: true } },
+                { step: "runPHP", code: "<?php require \"/tmp/pr/setup.php\";" }
+              ]
+            }' )
+
+          echo "url=https://playground.wordpress.net/#$( jq -rn --argjson blueprint "$BLUEPRINT" '$blueprint|tojson|@uri' )" >> "$GITHUB_OUTPUT"
+
+      - name: Write the comment
+        env:
+          PLAYGROUND_URL: ${{ steps.playground.outputs.url }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cat > "$RUNNER_TEMP/test-the-build.md" <<EOF
+          ### Test the build
+
+          #### WordPress Playground - runs in your browser
+
+          :shield: [Open a store with this build](${PLAYGROUND_URL}): a fresh store on the Sift for WooCommerce settings screen, logged in as an administrator. It has one product, cash on delivery, and every event the settings screen offers switched on.
+
+          :information_source: The store has no Sift keys, so it sends nothing to Sift and gets no decisions back. Events stop in the queue: add the product to the cart or place an order, then search for \`sift\` under WooCommerce > Status > Scheduled Actions > Pending. "Run" on an event builds its full payload and writes it, as a failed send, to the \`sift-for-woocommerce\` log under WooCommerce > Status > Logs. Sift's decision webhooks cannot reach a site that runs in your browser. Stripe, WooPayments and PayPal are not installed, so order events carry no payment method details. Do not enter real Sift keys in a preview. The link stops working 14 days after the last build.
+
+          ---
+
+          Build info:
+
+          - Latest commit: ${PR_HEAD_SHA}
+          - Build time: $( date -u "+%Y-%m-%d %H:%M:%S UTC" )
+
+          _Note: the build is updated when a new commit is pushed to this PR._
+          EOF
+
+          cat "$RUNNER_TEMP/test-the-build.md" >> "$GITHUB_STEP_SUMMARY"
+
+      # The token of a pull request from a fork cannot write comments; the job summary has the same text.
+      - name: Add or update the comment in the PR
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          COMMENT_IDS=$( gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq '.[] | select( .user.login == "github-actions[bot]" and ( .body | startswith( "### Test the build" ) ) ) | .id' )
+          COMMENT_ID=$( head -n 1 <<<"$COMMENT_IDS" )
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" -X PATCH -F "body=@${RUNNER_TEMP}/test-the-build.md" --silent
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -F "body=@${RUNNER_TEMP}/test-the-build.md" --silent
+          fi
