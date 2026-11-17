@@ -52,7 +52,7 @@ jobs:
       - name: Grab wp-env dir
         id: wp_env_dir
         run: |
-          echo "WPENV_DIR=$(npx wp-env install-path)" >> $GITHUB_OUTPUT
+          echo "WPENV_DIR=$(npx wp-env status --json | jq -r .installPath)" >> $GITHUB_OUTPUT
 
       # setup the wp-env cache
 #      - name: Cache wp-env
