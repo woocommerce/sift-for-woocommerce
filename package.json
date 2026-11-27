@@ -30,6 +30,9 @@
   "overrides": {
     "@wordpress/env": {
       "rimraf": "^6.1.4"
+    },
+    "@wp-playground/storage": {
+      "isomorphic-git": "1.38.6"
     }
   },
   "rtlcssConfig": {
