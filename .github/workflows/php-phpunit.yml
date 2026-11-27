@@ -21,15 +21,23 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Set up PHP for Composer
+        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # 2.37.1
+        with:
+          php-version: '8.3'
+          extensions: mbstring
+          tools: composer
+
       # setup the composer cache (vendor) with github actions cache and the cache dir defined in the previous step
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: /tmp/composer-cache
           key: ${{ runner.os }}-${{ hashFiles('**/composer.lock') }}
 
-      # run composer install
       - name: Composer Install
-        uses: php-actions/composer@8a65f0d3c6a1d17ca4800491a40b5756a4c164f3 # v6
+        run: composer install --no-interaction --no-progress
+        env:
+          COMPOSER_CACHE_DIR: /tmp/composer-cache
 
       # get the node version from the .nvmrc file
       - name: Read .nvmrc
@@ -52,7 +60,7 @@ jobs:
       - name: Grab wp-env dir
         id: wp_env_dir
         run: |
-          echo "WPENV_DIR=$(npx wp-env install-path)" >> $GITHUB_OUTPUT
+          echo "WPENV_DIR=$(npx wp-env status --json | jq -r .installPath)" >> $GITHUB_OUTPUT
 
       # setup the wp-env cache
 #      - name: Cache wp-env
