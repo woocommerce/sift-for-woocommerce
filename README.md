@@ -54,6 +54,8 @@ API Requests must contain a valid `authorization` header.  Use the following to 
 
 ## Local Development
 
+Use Node.js 24.18.0 or later and npm 11.16.0 or later.
+
 1. `npm install`
 2. `composer install`
 3. `npm start`
