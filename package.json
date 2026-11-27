@@ -14,7 +14,7 @@
   "repository": "https://github.com/woocommerce/sift-for-woocommerce",
   "bugs": "https://github.com/woocommerce/sift-for-woocommerce/issues",
   "engines": {
-    "node": ">=24.18.0",
+    "node": "^24.18.0 || >=26.0.0",
     "npm": ">=11.16.0"
   },
   "devDependencies": {
@@ -22,10 +22,30 @@
     "@wordpress/browserslist-config": "^5.9.1",
     "@wordpress/env": "^12.0.0",
     "@wordpress/postcss-plugins-preset": "^4.10.2",
-    "@wordpress/scripts": "^25.3.4",
+    "@wordpress/scripts": "^37.2.0",
     "npm-run-all": "^4.1.5",
     "postcss-cli": "^10.1.0",
     "rtlcss": "^4.0.0"
+  },
+  "overrides": {
+    "@wordpress/env": {
+      "rimraf": "^6.1.4"
+    },
+    "@wp-playground/storage": {
+      "isomorphic-git": "1.38.6"
+    },
+    "copy-webpack-plugin": {
+      "serialize-javascript": "^7.1.4"
+    },
+    "markdownlint-cli": {
+      "minimatch": "^11.0.1",
+      "js-yaml": "~5.4.2",
+      "smol-toml": "^1.9.1"
+    },
+    "micromark-extension-math": {
+      "katex": "^0.18.2"
+    },
+    "qs": "^6.16.1"
   },
   "rtlcssConfig": {
     "options": {
@@ -49,7 +69,6 @@
     "lint": "npm-run-all --sequential lint:**",
     "lint:pkg-json": "wp-scripts lint-pkg-json",
     "lint:readme-md": "wp-scripts lint-md-docs README.md",
-    "packages-update": "wp-scripts packages-update --dist-tag=wp-6.2",
     "check-engines": "wp-scripts check-engines",
     "check-licenses": "wp-scripts check-licenses",
     "start": "wp-env start",
