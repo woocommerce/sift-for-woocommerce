@@ -14,7 +14,7 @@
   "repository": "https://github.com/woocommerce/sift-for-woocommerce",
   "bugs": "https://github.com/woocommerce/sift-for-woocommerce/issues",
   "engines": {
-    "node": ">=24.18.0",
+    "node": "^24.18.0 || >=26.0.0",
     "npm": ">=11.16.0"
   },
   "devDependencies": {
