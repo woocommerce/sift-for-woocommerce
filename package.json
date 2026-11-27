@@ -37,6 +37,9 @@
     "copy-webpack-plugin": {
       "serialize-javascript": "^7.1.4"
     },
+    "micromark-extension-math": {
+      "katex": "^0.18.2"
+    },
     "qs": "^6.16.1"
   },
   "rtlcssConfig": {
