@@ -69,7 +69,7 @@
     "lint": "npm-run-all --sequential lint:**",
     "lint:pkg-json": "wp-scripts lint-pkg-json",
     "lint:readme-md": "wp-scripts lint-md-docs README.md",
-    "packages-update": "wp-scripts packages-update --dist-tag=wp-6.2",
+    "packages-update": "npm update @wordpress/browserslist-config @wordpress/env @wordpress/postcss-plugins-preset @wordpress/scripts",
     "check-engines": "wp-scripts check-engines",
     "check-licenses": "wp-scripts check-licenses",
     "start": "wp-env start",
