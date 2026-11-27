@@ -34,6 +34,9 @@
     "@wp-playground/storage": {
       "isomorphic-git": "1.38.6"
     },
+    "copy-webpack-plugin": {
+      "serialize-javascript": "^7.1.4"
+    },
     "qs": "^6.16.1"
   },
   "rtlcssConfig": {
