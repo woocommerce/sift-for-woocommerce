@@ -27,6 +27,11 @@
     "postcss-cli": "^10.1.0",
     "rtlcss": "^4.0.0"
   },
+  "overrides": {
+    "@wordpress/env": {
+      "rimraf": "^6.1.4"
+    }
+  },
   "rtlcssConfig": {
     "options": {
       "autoRename": false,
