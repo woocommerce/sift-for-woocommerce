@@ -37,6 +37,9 @@
     "copy-webpack-plugin": {
       "serialize-javascript": "^7.1.4"
     },
+    "markdownlint-cli": {
+      "minimatch": "^11.0.1"
+    },
     "micromark-extension-math": {
       "katex": "^0.18.2"
     },
